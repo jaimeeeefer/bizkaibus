@@ -3,159 +3,179 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Buscador de Autobuses Bizkaibus</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-          crossorigin=""/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-            crossorigin=""></script>
+    <title>Localizador de Autobuses Bizkaibus</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; color: #333; }
-        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 800px; margin: auto; }
-        h1 { color: #005597; }
-        label { font-weight: bold; margin-right: 10px; }
-        input[type="text"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; min-width: 150px; margin-bottom: 10px; }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .input-group {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+            gap: 10px;
+        }
+        input[type="text"] {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            flex-grow: 1;
+            max-width: 200px;
+        }
         button {
             padding: 10px 15px;
-            background-color: #DA291C; /* Color Bizkaibus */
+            background-color: #007bff;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 1em;
+            font-size: 16px;
         }
-        button:hover { background-color: #A81F14; }
-        #map { height: 500px; width: 100%; margin-top: 20px; border: 1px solid #ccc; }
-        #status { margin-top: 15px; font-style: italic; padding: 10px; border-radius: 4px; }
-        .status-error { background-color: #ffebee; color: #c62828; border: 1px solid #c62828; }
-        .status-success { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #2e7d32; }
-        .status-loading { background-color: #fff9c4; color: #f57f17; border: 1px solid #f57f17; }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #map {
+            height: 500px;
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        #message {
+            margin-top: 15px;
+            text-align: center;
+            color: #dc3545;
+        }
+        .bus-info {
+            font-size: 14px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
-
     <div class="container">
-        <h1><img src="https://www.bizkaia.eus/documents/10184/0/Escudo+ Diputacion+Foral+de+Bizkaia+-+Koloretan.svg" alt="Escudo Bizkaia" style="height:40px; vertical-align: middle;"> Localizador de Autobuses Bizkaibus</h1>
-        <p>Introduce el código de la línea de Bizkaibus (ej: A3136, A3923) y pulsa "Buscar".</p>
-        <div>
-            <label for="lineaInput">Línea:</label>
-            <input type="text" id="lineaInput" placeholder="Ej: A3136">
-            <button onclick="buscarAutobuses()">Buscar Autobuses</button>
+        <h1>Localizador de Autobuses Bizkaibus</h1>
+
+        <div class="input-group">
+            <input type="text" id="lineNumber" placeholder="Introduce la línea (ej: A3247)">
+            <button onclick="searchBuses()">Buscar Autobuses</button>
         </div>
-        <div id="status"></div>
+
+        <div id="message"></div>
+
         <div id="map"></div>
     </div>
 
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
-        const BIZKAIBUS_XML_URL = 'https://ctb-siri.s3.eu-south-2.amazonaws.com/bizkaibus-vehicle-positions.xml';
         let map;
-        let busMarkersLayer;
+        let busMarkers = L.featureGroup(); // Grupo para mantener todos los marcadores de autobuses
 
-        // Inicializar el mapa cuando el DOM esté cargado
-        document.addEventListener('DOMContentLoaded', () => {
-            // Coordenadas aproximadas del centro de Bizkaia
-            map = L.map('map').setView([43.2630, -2.9350], 10); // Bilbao aprox.
+        // Inicializar el mapa
+        function initMap() {
+            if (map) {
+                map.remove(); // Si el mapa ya existe, lo removemos para reinicializar
+            }
+            map = L.map('map').setView([43.262986, -2.934985], 11); // Coordenadas centradas en Bilbao, nivel de zoom 11
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             }).addTo(map);
 
-            busMarkersLayer = L.featureGroup().addTo(map); // Capa para gestionar los marcadores
-        });
+            busMarkers.addTo(map); // Añadir el grupo de marcadores al mapa
+        }
 
-        async function buscarAutobuses() {
-            const lineaInput = document.getElementById('lineaInput').value.trim().toUpperCase();
-            const statusDiv = document.getElementById('status');
+        // Llamar a initMap al cargar la página
+        document.addEventListener('DOMContentLoaded', initMap);
 
-            if (!lineaInput) {
-                statusDiv.textContent = 'Por favor, introduce un número de línea.';
-                statusDiv.className = 'status-error';
+        async function searchBuses() {
+            const lineNumber = document.getElementById('lineNumber').value.trim().toUpperCase();
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = ''; // Limpiar mensajes anteriores
+
+            if (!lineNumber) {
+                messageDiv.textContent = 'Por favor, introduce una línea de Bizkaibus.';
                 return;
             }
 
-            statusDiv.textContent = 'Buscando autobuses... ⏳';
-            statusDiv.className = 'status-loading';
-            busMarkersLayer.clearLayers(); // Limpiar marcadores anteriores
+            busMarkers.clearLayers(); // Limpiar marcadores anteriores del grupo
 
             try {
-                // Se añade un parámetro que cambie con el tiempo para intentar evitar problemas de caché.
-                const response = await fetch(`${BIZKAIBUS_XML_URL}?timestamp=${new Date().getTime()}`, {
-                    method: 'GET', // Método explícito
-                    mode: 'cors', // Modo CORS explícito, aunque el servidor debe permitirlo
-                    cache: 'no-cache' // Evitar caché
-                });
+                // Si tienes problemas de CORS, aquí es donde usarías un proxy.
+                // Por ejemplo, si tu proxy está en /api/bizkaibus:
+                // const response = await fetch(`/api/bizkaibus`);
+                const response = await fetch('https://ctb-siri.s3.eu-south-2.amazonaws.com/bizkaibus-vehicle-positions.xml');
 
                 if (!response.ok) {
-                    // Este error se activa si la respuesta HTTP no es exitosa (ej. 404, 500)
-                    // OJO: Un bloqueo por CORS a menudo no llega aquí, sino que lanza un NetworkError antes.
-                    throw new Error(`Error HTTP al cargar los datos XML: ${response.status} ${response.statusText}`);
+                    throw new Error(`Error al cargar los datos: ${response.statusText}`);
                 }
+
                 const xmlText = await response.text();
                 const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+                const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
 
-                // Comprobar si el XML se parseó correctamente (simple check)
-                const parseError = xmlDoc.getElementsByTagName("parsererror");
-                if (parseError.length > 0) {
-                    console.error("Error al parsear XML:", parseError[0].textContent);
-                    throw new Error("El formato del archivo XML recibido no es válido.");
-                }
+                const vehicleActivity = xmlDoc.querySelectorAll('VehicleActivity');
+                let foundBuses = 0;
 
-                const vehicleActivities = xmlDoc.getElementsByTagName('VehicleActivity');
-                let busesEncontrados = 0;
-                const newMarkers = [];
+                vehicleActivity.forEach(activity => {
+                    const lineRefElement = activity.querySelector('MonitoredVehicleJourney LineRef');
+                    const latitudeElement = activity.querySelector('VehicleLocation Latitude');
+                    const longitudeElement = activity.querySelector('VehicleLocation Longitude');
+                    const vehicleRefElement = activity.querySelector('VehicleRef');
+                    const publishedLineNameElement = activity.querySelector('PublishedLineName');
 
-                for (let i = 0; i < vehicleActivities.length; i++) {
-                    const activity = vehicleActivities[i];
-                    const monitoredJourney = activity.getElementsByTagName('MonitoredVehicleJourney')[0];
-                    if (!monitoredJourney) continue;
+                    if (lineRefElement && latitudeElement && longitudeElement && vehicleRefElement && publishedLineNameElement) {
+                        const currentLineRef = lineRefElement.textContent.trim();
+                        if (currentLineRef === lineNumber) {
+                            const lat = parseFloat(latitudeElement.textContent);
+                            const lon = parseFloat(longitudeElement.textContent);
+                            const vehicleId = vehicleRefElement.textContent;
+                            const publishedLineName = publishedLineNameElement.textContent;
 
-                    const publishedLineNameTag = monitoredJourney.getElementsByTagName('PublishedLineName')[0];
-                    if (!publishedLineNameTag) continue;
-
-                    const currentLine = publishedLineNameTag.textContent.trim().toUpperCase();
-
-                    if (currentLine === lineaInput) {
-                        const vehicleLocation = monitoredJourney.getElementsByTagName('VehicleLocation')[0];
-                        const vehicleRefTag = monitoredJourney.getElementsByTagName('VehicleRef')[0];
-                        const vehicleRef = vehicleRefTag ? vehicleRefTag.textContent : "N/A";
-
-                        if (vehicleLocation) {
-                            const latTag = vehicleLocation.getElementsByTagName('Latitude')[0];
-                            const lonTag = vehicleLocation.getElementsByTagName('Longitude')[0];
-
-                            if (latTag && lonTag) {
-                                const lat = parseFloat(latTag.textContent);
-                                const lon = parseFloat(lonTag.textContent);
-
-                                const marker = L.marker([lat, lon]);
-                                marker.bindPopup(`<b>Línea: ${currentLine}</b><br>Vehículo: ${vehicleRef}<br>Lat: ${lat.toFixed(5)}, Lon: ${lon.toFixed(5)}`);
-                                newMarkers.push(marker);
-                                busesEncontrados++;
+                            if (!isNaN(lat) && !isNaN(lon)) {
+                                const marker = L.marker([lat, lon]).addTo(busMarkers); // Añadir al grupo
+                                marker.bindPopup(`
+                                    <div class="bus-info">
+                                        <b>Línea:</b> ${publishedLineName} (${currentLineRef})<br>
+                                        <b>Vehículo:</b> ${vehicleId}<br>
+                                        <b>Coordenadas:</b> ${lat.toFixed(6)}, ${lon.toFixed(6)}
+                                    </div>
+                                `);
+                                foundBuses++;
                             }
                         }
                     }
-                }
+                });
 
-                if (busesEncontrados > 0) {
-                    newMarkers.forEach(marker => busMarkersLayer.addLayer(marker));
-                    map.fitBounds(busMarkersLayer.getBounds(), { padding: [50, 50] });
-                    statusDiv.textContent = `Se encontraron ${busesEncontrados} autobús(es) para la línea ${lineaInput}. ✅`;
-                    statusDiv.className = 'status-success';
+                if (foundBuses === 0) {
+                    messageDiv.textContent = `No se encontraron autobuses para la línea ${lineNumber}.`;
                 } else {
-                    statusDiv.textContent = `No se encontraron autobuses para la línea ${lineaInput} o la línea no existe en los datos actuales. 🙁`;
-                    statusDiv.className = 'status-error'; // Usamos error para "no encontrado" también
-                    map.setView([43.2630, -2.9350], 10); // Restablecer vista
+                    messageDiv.textContent = `Mostrando ${foundBuses} autobús(es) para la línea ${lineNumber}.`;
+                    // Centrar el mapa en los marcadores encontrados
+                    if (busMarkers.getLayers().length > 0) {
+                        map.fitBounds(busMarkers.getBounds());
+                    }
                 }
 
             } catch (error) {
-                console.error('Error detallado:', error);
-                statusDiv.textContent = `Error al procesar la solicitud: ${error.message}. Es muy probable que sea un problema de CORS o de red. Consulta la consola del navegador (F12) para más detalles. ❌`;
-                statusDiv.className = 'status-error';
+                console.error('Error al buscar autobuses:', error);
+                messageDiv.textContent = `Error al cargar los datos de los autobuses. Detalles: ${error.message}. Si experimentas errores de CORS, considera usar un servidor proxy.`;
             }
         }
     </script>
-
 </body>
 </html>
