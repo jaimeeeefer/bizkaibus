@@ -3,84 +3,94 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mapa de Bizkaibus</title>
+  <title>Localizador de Bizkaibus</title>
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
     body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
     #map { height: 80vh; width: 100%; }
-    .controls { padding: 1em; background: #f7f7f7; }
-    .controls input { padding: 0.5em; width: 200px; }
-    .controls button { padding: 0.5em 1em; }
+    #controls { padding: 1rem; background: #f4f4f4; }
+    label { font-weight: bold; }
+    input[type="text"] { padding: 0.5rem; width: 200px; }
+    button { padding: 0.5rem 1rem; }
   </style>
 </head>
 <body>
-  <div class="controls">
-    <label for="lineInput">Línea Bizkaibus:</label>
-    <input type="text" id="lineInput" placeholder="Ej: A3414" />
-    <button id="loadBtn">Cargar Mapa</button>
+  <div id="controls">
+    <label for="lineInput">Línea de Bizkaibus:</label>
+    <input type="text" id="lineInput" placeholder="e.g. A3510" />
+    <button id="searchBtn">Buscar</button>
   </div>
   <div id="map"></div>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-    // Inicializar mapa
-    const map = L.map('map').setView([43.26, -2.96], 11);
+    // Inicializar el mapa centrado en Bizkaia
+    const map = L.map('map').setView([43.2630, -2.9349], 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    document.getElementById('loadBtn').addEventListener('click', () => {
-      const line = document.getElementById('lineInput').value.trim().toUpperCase();
-      if (!line) return alert('Introduce una línea de autobús.');
-
-      fetch('https://cors-anywhere.herokuapp.com/https://ctb-siri.s3.eu-south-2.amazonaws.com/bizkaibus-vehicle-positions.xml')
-        .then(res => res.text())
-        .then(xmlText => {
-          const parser = new DOMParser();
-          const xml = parser.parseFromString(xmlText, 'application/xml');
-          const activities = xml.getElementsByTagName('VehicleActivity');
-
-          // Limpiar marcadores anteriores
-          if (window.busLayer) { map.removeLayer(window.busLayer); }
-          const markers = [];
-
-          Array.from(activities).forEach(act => {
-            const journeyRefEl = act.getElementsByTagName('VehicleJourneyRef')[0];
-            const latEl = act.getElementsByTagName('Latitude')[0];
-            const lonEl = act.getElementsByTagName('Longitude')[0];
-            const vehicleRefEl = act.getElementsByTagName('VehicleRef')[0];
-
-            if (!journeyRefEl || !latEl || !lonEl || !vehicleRefEl) return;
-
-            const journeyRef = journeyRefEl.textContent;
-            const match = journeyRef.match(/trp_(A\d+)/i);
-
-            if (match && match[1].toUpperCase() === line) {
-              const lat = parseFloat(latEl.textContent);
-              const lon = parseFloat(lonEl.textContent);
-              const vehicleId = vehicleRefEl.textContent;
-
-              const marker = L.marker([lat, lon]).bindPopup(`Bus ID: ${vehicleId}`);
-              markers.push(marker);
-            }
-          });
-
-          if (markers.length === 0) {
-            alert('No se han encontrado buses para la línea ' + line);
-            return;
-          }
-
-          window.busLayer = L.layerGroup(markers).addTo(map);
-          const group = L.featureGroup(markers);
-          map.fitBounds(group.getBounds().pad(0.2));
-        })
-        .catch(err => {
-          console.error(err);
-          alert('Error al cargar datos.');
-        });
+    document.getElementById('searchBtn').addEventListener('click', () => {
+      const line = document.getElementById('lineInput').value.trim();
+      if (!line) {
+        alert('Por favor, introduce una línea de autobús');
+        return;
+      }
+      fetchAndPlot(line);
     });
+
+    async function fetchAndPlot(line) {
+      try {
+        const url = 'https://ctb-siri.s3.eu-south-2.amazonaws.com/bizkaibus-vehicle-positions.xml';
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Error al obtener datos');
+        const xmlText = await response.text();
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(xmlText, 'application/xml');
+
+        // Eliminar marcadores anteriores
+        if (window.busLayer) {
+          window.busLayer.clearLayers();
+        } else {
+          window.busLayer = L.layerGroup().addTo(map);
+        }
+
+        // Buscar vehículos
+        const vehicles = xml.querySelectorAll('VehiclePosition');
+        let found = false;
+        vehicles.forEach(v => {
+          const lineRef = v.querySelector('PublishedLineName')?.textContent;
+          if (lineRef === line) {
+            found = true;
+            const lat = parseFloat(v.querySelector('Latitude')?.textContent);
+            const lon = parseFloat(v.querySelector('Longitude')?.textContent);
+            const bearing = v.querySelector('Bearing')?.textContent || '';
+            const odometer = v.querySelector('Odometer')?.textContent || '';
+
+            const marker = L.marker([lat, lon]);
+            marker.bindPopup(
+              `<b>Línea:</b> ${lineRef}<br>` +
+              `<b>Coordenadas:</b> ${lat.toFixed(5)}, ${lon.toFixed(5)}<br>` +
+              (bearing ? `<b>Orientación:</b> ${bearing}°<br>` : '') +
+              (odometer ? `<b>Odómetro:</b> ${odometer} km<br>` : '')
+            );
+            window.busLayer.addLayer(marker);
+          }
+        });
+
+        if (!found) {
+          alert('No se encontraron autobuses para la línea ' + line);
+        } else {
+          // Ajustar vista para mostrar todos los marcadores
+          map.fitBounds(window.busLayer.getBounds(), { padding: [50, 50] });
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Hubo un error al procesar los datos.');
+      }
+    }
   </script>
 </body>
 </html>
