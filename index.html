@@ -61,7 +61,7 @@
       // Normalizar input
       const normLine = line.replace(/-/g,'').toUpperCase();
       try {
-        const res = await fetch('https://corsproxy.io/?https://ctb-siri.s3.eu-south-2.amazonaws.com/bizkaibus-vehicle-positions.xml');
+       const res = await fetch('https://mi-proxy.onrender.com/bizkaibus');
         if (!res.ok) throw new Error('Error al descargar XML');
         const xmlText = await res.text();
         const xml = new DOMParser().parseFromString(xmlText, 'application/xml');
