@@ -12,28 +12,31 @@
             crossorigin=""></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; color: #333; }
-        #map { height: 500px; width: 100%; margin-top: 20px; border: 1px solid #ccc; }
-        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        h1 { color: #005597; } /* Color corporativo Bizkaibus aprox. */
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 800px; margin: auto; }
+        h1 { color: #005597; }
         label { font-weight: bold; margin-right: 10px; }
-        input[type="text"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; min-width: 100px; }
+        input[type="text"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; min-width: 150px; margin-bottom: 10px; }
         button {
             padding: 10px 15px;
-            background-color: #007bff; /* Azul estándar */
+            background-color: #DA291C; /* Color Bizkaibus */
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
             font-size: 1em;
         }
-        button:hover { background-color: #0056b3; }
-        #status { margin-top: 15px; font-style: italic; }
+        button:hover { background-color: #A81F14; }
+        #map { height: 500px; width: 100%; margin-top: 20px; border: 1px solid #ccc; }
+        #status { margin-top: 15px; font-style: italic; padding: 10px; border-radius: 4px; }
+        .status-error { background-color: #ffebee; color: #c62828; border: 1px solid #c62828; }
+        .status-success { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #2e7d32; }
+        .status-loading { background-color: #fff9c4; color: #f57f17; border: 1px solid #f57f17; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1>🚌 Localizador de Autobuses Bizkaibus</h1>
+        <h1><img src="https://www.bizkaia.eus/documents/10184/0/Escudo+ Diputacion+Foral+de+Bizkaia+-+Koloretan.svg" alt="Escudo Bizkaia" style="height:40px; vertical-align: middle;"> Localizador de Autobuses Bizkaibus</h1>
         <p>Introduce el código de la línea de Bizkaibus (ej: A3136, A3923) y pulsa "Buscar".</p>
         <div>
             <label for="lineaInput">Línea:</label>
@@ -52,7 +55,7 @@
         // Inicializar el mapa cuando el DOM esté cargado
         document.addEventListener('DOMContentLoaded', () => {
             // Coordenadas aproximadas del centro de Bizkaia
-            map = L.map('map').setView([43.2630, -2.9350], 10);
+            map = L.map('map').setView([43.2630, -2.9350], 10); // Bilbao aprox.
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -67,23 +70,37 @@
 
             if (!lineaInput) {
                 statusDiv.textContent = 'Por favor, introduce un número de línea.';
-                statusDiv.style.color = 'red';
+                statusDiv.className = 'status-error';
                 return;
             }
 
             statusDiv.textContent = 'Buscando autobuses... ⏳';
-            statusDiv.style.color = 'orange';
+            statusDiv.className = 'status-loading';
             busMarkersLayer.clearLayers(); // Limpiar marcadores anteriores
 
             try {
-                // Para evitar problemas de caché con el XML, se añade un parámetro que cambie con el tiempo.
-                const response = await fetch(`${BIZKAIBUS_XML_URL}?timestamp=${new Date().getTime()}`);
+                // Se añade un parámetro que cambie con el tiempo para intentar evitar problemas de caché.
+                const response = await fetch(`${BIZKAIBUS_XML_URL}?timestamp=${new Date().getTime()}`, {
+                    method: 'GET', // Método explícito
+                    mode: 'cors', // Modo CORS explícito, aunque el servidor debe permitirlo
+                    cache: 'no-cache' // Evitar caché
+                });
+
                 if (!response.ok) {
-                    throw new Error(`Error al cargar los datos XML: ${response.status} ${response.statusText}`);
+                    // Este error se activa si la respuesta HTTP no es exitosa (ej. 404, 500)
+                    // OJO: Un bloqueo por CORS a menudo no llega aquí, sino que lanza un NetworkError antes.
+                    throw new Error(`Error HTTP al cargar los datos XML: ${response.status} ${response.statusText}`);
                 }
                 const xmlText = await response.text();
                 const parser = new DOMParser();
                 const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+
+                // Comprobar si el XML se parseó correctamente (simple check)
+                const parseError = xmlDoc.getElementsByTagName("parsererror");
+                if (parseError.length > 0) {
+                    console.error("Error al parsear XML:", parseError[0].textContent);
+                    throw new Error("El formato del archivo XML recibido no es válido.");
+                }
 
                 const vehicleActivities = xmlDoc.getElementsByTagName('VehicleActivity');
                 let busesEncontrados = 0;
@@ -123,19 +140,19 @@
 
                 if (busesEncontrados > 0) {
                     newMarkers.forEach(marker => busMarkersLayer.addLayer(marker));
-                    map.fitBounds(busMarkersLayer.getBounds(), { padding: [50, 50] }); // Ajustar zoom a los marcadores
+                    map.fitBounds(busMarkersLayer.getBounds(), { padding: [50, 50] });
                     statusDiv.textContent = `Se encontraron ${busesEncontrados} autobús(es) para la línea ${lineaInput}. ✅`;
-                    statusDiv.style.color = 'green';
+                    statusDiv.className = 'status-success';
                 } else {
-                    statusDiv.textContent = `No se encontraron autobuses para la línea ${lineaInput} o la línea no existe. 🙁`;
-                    statusDiv.style.color = 'red';
-                    map.setView([43.2630, -2.9350], 10); // Restablecer vista si no hay buses
+                    statusDiv.textContent = `No se encontraron autobuses para la línea ${lineaInput} o la línea no existe en los datos actuales. 🙁`;
+                    statusDiv.className = 'status-error'; // Usamos error para "no encontrado" también
+                    map.setView([43.2630, -2.9350], 10); // Restablecer vista
                 }
 
             } catch (error) {
-                console.error('Error:', error);
-                statusDiv.textContent = `Error al procesar la solicitud: ${error.message}. Consulta la consola para más detalles. ❌`;
-                statusDiv.style.color = 'red';
+                console.error('Error detallado:', error);
+                statusDiv.textContent = `Error al procesar la solicitud: ${error.message}. Es muy probable que sea un problema de CORS o de red. Consulta la consola del navegador (F12) para más detalles. ❌`;
+                statusDiv.className = 'status-error';
             }
         }
     </script>
