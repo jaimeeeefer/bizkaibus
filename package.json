@@ -1,7 +1,7 @@
 {
   "name": "bizkaibus-proxy",
   "version": "1.0.0",
-  "description": "Proxy CORS para datos de Bizkaibus",
+  "description": "Proxy para obtener el XML de Bizkaibus con CORS",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
