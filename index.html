@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buscador de Autobuses Bizkaibus</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; color: #333; }
+        #map { height: 500px; width: 100%; margin-top: 20px; border: 1px solid #ccc; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #005597; } /* Color corporativo Bizkaibus aprox. */
+        label { font-weight: bold; margin-right: 10px; }
+        input[type="text"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; min-width: 100px; }
+        button {
+            padding: 10px 15px;
+            background-color: #007bff; /* Azul estándar */
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        button:hover { background-color: #0056b3; }
+        #status { margin-top: 15px; font-style: italic; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🚌 Localizador de Autobuses Bizkaibus</h1>
+        <p>Introduce el código de la línea de Bizkaibus (ej: A3136, A3923) y pulsa "Buscar".</p>
+        <div>
+            <label for="lineaInput">Línea:</label>
+            <input type="text" id="lineaInput" placeholder="Ej: A3136">
+            <button onclick="buscarAutobuses()">Buscar Autobuses</button>
+        </div>
+        <div id="status"></div>
+        <div id="map"></div>
+    </div>
+
+    <script>
+        const BIZKAIBUS_XML_URL = 'https://ctb-siri.s3.eu-south-2.amazonaws.com/bizkaibus-vehicle-positions.xml';
+        let map;
+        let busMarkersLayer;
+
+        // Inicializar el mapa cuando el DOM esté cargado
+        document.addEventListener('DOMContentLoaded', () => {
+            // Coordenadas aproximadas del centro de Bizkaia
+            map = L.map('map').setView([43.2630, -2.9350], 10);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            busMarkersLayer = L.featureGroup().addTo(map); // Capa para gestionar los marcadores
+        });
+
+        async function buscarAutobuses() {
+            const lineaInput = document.getElementById('lineaInput').value.trim().toUpperCase();
+            const statusDiv = document.getElementById('status');
+
+            if (!lineaInput) {
+                statusDiv.textContent = 'Por favor, introduce un número de línea.';
+                statusDiv.style.color = 'red';
+                return;
+            }
+
+            statusDiv.textContent = 'Buscando autobuses... ⏳';
+            statusDiv.style.color = 'orange';
+            busMarkersLayer.clearLayers(); // Limpiar marcadores anteriores
+
+            try {
+                // Para evitar problemas de caché con el XML, se añade un parámetro que cambie con el tiempo.
+                const response = await fetch(`${BIZKAIBUS_XML_URL}?timestamp=${new Date().getTime()}`);
+                if (!response.ok) {
+                    throw new Error(`Error al cargar los datos XML: ${response.status} ${response.statusText}`);
+                }
+                const xmlText = await response.text();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+
+                const vehicleActivities = xmlDoc.getElementsByTagName('VehicleActivity');
+                let busesEncontrados = 0;
+                const newMarkers = [];
+
+                for (let i = 0; i < vehicleActivities.length; i++) {
+                    const activity = vehicleActivities[i];
+                    const monitoredJourney = activity.getElementsByTagName('MonitoredVehicleJourney')[0];
+                    if (!monitoredJourney) continue;
+
+                    const publishedLineNameTag = monitoredJourney.getElementsByTagName('PublishedLineName')[0];
+                    if (!publishedLineNameTag) continue;
+
+                    const currentLine = publishedLineNameTag.textContent.trim().toUpperCase();
+
+                    if (currentLine === lineaInput) {
+                        const vehicleLocation = monitoredJourney.getElementsByTagName('VehicleLocation')[0];
+                        const vehicleRefTag = monitoredJourney.getElementsByTagName('VehicleRef')[0];
+                        const vehicleRef = vehicleRefTag ? vehicleRefTag.textContent : "N/A";
+
+                        if (vehicleLocation) {
+                            const latTag = vehicleLocation.getElementsByTagName('Latitude')[0];
+                            const lonTag = vehicleLocation.getElementsByTagName('Longitude')[0];
+
+                            if (latTag && lonTag) {
+                                const lat = parseFloat(latTag.textContent);
+                                const lon = parseFloat(lonTag.textContent);
+
+                                const marker = L.marker([lat, lon]);
+                                marker.bindPopup(`<b>Línea: ${currentLine}</b><br>Vehículo: ${vehicleRef}<br>Lat: ${lat.toFixed(5)}, Lon: ${lon.toFixed(5)}`);
+                                newMarkers.push(marker);
+                                busesEncontrados++;
+                            }
+                        }
+                    }
+                }
+
+                if (busesEncontrados > 0) {
+                    newMarkers.forEach(marker => busMarkersLayer.addLayer(marker));
+                    map.fitBounds(busMarkersLayer.getBounds(), { padding: [50, 50] }); // Ajustar zoom a los marcadores
+                    statusDiv.textContent = `Se encontraron ${busesEncontrados} autobús(es) para la línea ${lineaInput}. ✅`;
+                    statusDiv.style.color = 'green';
+                } else {
+                    statusDiv.textContent = `No se encontraron autobuses para la línea ${lineaInput} o la línea no existe. 🙁`;
+                    statusDiv.style.color = 'red';
+                    map.setView([43.2630, -2.9350], 10); // Restablecer vista si no hay buses
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                statusDiv.textContent = `Error al procesar la solicitud: ${error.message}. Consulta la consola para más detalles. ❌`;
+                statusDiv.style.color = 'red';
+            }
+        }
+    </script>
+
+</body>
+</html>
