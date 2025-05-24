@@ -106,7 +106,8 @@
           if (num) {
             busInfoMap.set(num, {
               matricula: fila[1]?.trim() || "—",
-              modelo: fila[2]?.trim() || "—"
+              modelo: fila[2]?.trim() || "—",
+              fecha: fila[3]?.trim() || "—"
             });
           }
         });
@@ -168,17 +169,18 @@
           }
 
           // Matrícula y modelo
-          const infoBus = busInfoMap.get(vref) || { matricula: "—", modelo: "—" };
+          const infoBus = busInfoMap.get(vref) || { matricula: "—", modelo: "—", fecha: "—"};
 
           // Marcador y popup
           const marcador = L.marker([lat, lon]).addTo(map);
-          marcador.bindPopup(
-            `Bus: ${vref}<br>` +
-            `Línea: ${lineaLimpia}<br>` +
-            `Parada: ${paradaTexto}<br>` +
-            `Matrícula: ${infoBus.matricula}<br>` +
-            `Modelo: ${infoBus.modelo}`
-          );
+          marcador.bindPopup(`
+            <b>Línea:<b> ${lineaLimpia}<br>
+            <b>Parada:<b> ${paradaTexto}<br>
+            <b>Bus:<b> ${vref}<br>
+            <b>Matrícula:<b> ${infoBus.matricula}<br>
+            <b>Modelo:<b> ${infoBus.modelo}<br>
+            <b>Fecha matriculación:<b> ${infoBus.fecha}
+          `);
           markers.push(marcador);
           encontrados++;
         }
