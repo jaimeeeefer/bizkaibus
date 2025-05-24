@@ -61,7 +61,7 @@
       // Normalizar input
       const normLine = line.replace(/-/g,'').toUpperCase();
       try {
-       const res = await fetch('https://bizkaibus.onrender.com');
+       const res = await fetch('https://bizkaibus.onrender.com/bizkaibus');
         if (!res.ok) throw new Error('Error al descargar XML');
         const xmlText = await res.text();
         const xml = new DOMParser().parseFromString(xmlText, 'application/xml');
