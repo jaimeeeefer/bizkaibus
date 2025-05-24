@@ -6,15 +6,53 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
-    body { font-family: sans-serif; text-align: center; padding: 1em; }
-    #map { height: 700px; margin-top: 1em; }
-    input, button { padding: 0.5em; font-size: 1em; margin: 0.5em; }
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 1em;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #controls {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 0.5em;
+      margin-bottom: 1em;
+    }
+
+    input {
+      padding: 0.5em;
+      font-size: 1em;
+      width: 300px;
+      max-width: 90vw;
+      box-sizing: border-box;
+    }
+
+    button {
+      padding: 0.5em 1em;
+      font-size: 1em;
+      cursor: pointer;
+    }
+
+    #map {
+      height: 80vh;
+      width: 100%;
+      max-width: 1000px;
+    }
   </style>
 </head>
 <body>
   <h1>Localizador de Autobuses Bizkaibus</h1>
-  <input type="text" id="linea" placeholder="Introduce nº de línea (ej: A3935)">
-  <button onclick="buscarBuses()">Buscar</button>
+  <div id="controls">
+    <input type="text" id="linea" placeholder="Introduce nº de línea (ej: A3935)">
+    <button onclick="buscarBuses()">Buscar</button>
+  </div>
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -51,14 +89,17 @@
           const lonTag = actividad.querySelector("Longitude");
 
           if (lineaTag && vehiculoTag && latTag && lonTag) {
-            const idLinea = lineaTag.textContent.trim().toUpperCase();
-            if (idLinea.includes(linea)) {
+            const rawLinea = lineaTag.textContent.trim().toUpperCase();
+            const match = rawLinea.match(/A\d{3,4}/);
+            const lineaLimpia = match ? match[0] : rawLinea;
+
+            if (lineaLimpia === linea) {
               const lat = parseFloat(latTag.textContent);
               const lon = parseFloat(lonTag.textContent);
               const vehiculo = vehiculoTag.textContent;
 
               const marker = L.marker([lat, lon]).addTo(map)
-                .bindPopup(`Bus ${vehiculo}<br>Línea: ${idLinea}`);
+                .bindPopup(`Bus: ${vehiculo}<br>Línea: ${lineaLimpia}`);
               markers.push(marker);
               encontrados++;
             }
@@ -79,4 +120,3 @@
   </script>
 </body>
 </html>
-
