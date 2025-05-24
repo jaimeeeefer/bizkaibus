@@ -15,23 +15,35 @@
       flex-direction: column;
       align-items: center;
     }
+
     #controls {
       display: flex;
+      flex-direction: row;
       flex-wrap: wrap;
       justify-content: center;
+      align-items: center;
       gap: 0.5em;
       margin-bottom: 1em;
     }
+
     input {
-      padding: 0.5em; font-size: 1em;
-      width: 300px; max-width: 90vw; box-sizing: border-box;
+      padding: 0.5em;
+      font-size: 1em;
+      width: 300px;
+      max-width: 90vw;
+      box-sizing: border-box;
     }
+
     button {
-      padding: 0.5em 1em; font-size: 1em; cursor: pointer;
+      padding: 0.5em 1em;
+      font-size: 1em;
+      cursor: pointer;
     }
+
     #map {
       height: 80vh;
-      width: 100%; max-width: 1750px;
+      width: 100%;
+      max-width: 1750px;
     }
   </style>
 </head>
@@ -43,12 +55,26 @@
   </div>
   <div id="map"></div>
 
+  <script>
+    // Autenticación básica por prompt
+    const USUARIO = "admin";
+    const CONTRASENA = "bizkaibus123";
+
+    function autenticar() {
+      const u = prompt("Usuario:");
+      const p = prompt("Contraseña:");
+      if (u !== USUARIO || p !== CONTRASENA) {
+        alert("Acceso denegado.");
+        document.body.innerHTML = "<h1>401 No autorizado</h1>";
+        throw new Error("Acceso denegado");
+      }
+    }
+
+    autenticar();
+  </script>
+
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-    // URL de tu hoja publicada como TSV
-    const SHEET_TSV_URL =
-      "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYeZkna4mwxp3p2azwTgAPcjeSBoUU_rhWW5gVZ7hqotNtojQOHtsjbEnnlJbrijBVwck_kWERE__6/pub?output=tsv";
-
     let map = L.map("map").setView([43.25, -2.93], 10);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OpenStreetMap",
@@ -56,53 +82,59 @@
 
     let markers = [];
     let paradasMap = new Map();
-    let busInfoMap = new Map(); // VehicleRef → { matricula, modelo }
+    let datosBusMap = new Map();
 
-    // 1️⃣ Cargar lista de paradas (igual que antes)
     async function cargarParadas() {
       try {
         const res = await fetch(
           "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/paradas"
         );
+        if (!res.ok) throw new Error("Error cargando archivo de paradas");
         const text = await res.text();
-        text.split("\n").forEach(linea => {
-          const t = linea.trim();
-          if (!t) return;
-          const partes = t.split(" - ");
-          if (partes.length >= 2) paradasMap.set(partes[0], t);
-        });
-      } catch (e) {
-        console.error("Error cargando paradas:", e);
-      }
-    }
-
-    // 2️⃣ Cargar info de buses desde Google Sheet (TSV)
-    async function cargarBusInfo() {
-      try {
-        const res = await fetch(SHEET_TSV_URL);
-        const tsv = await res.text();
-        const filas = tsv.trim().split("\n").map(r => r.split("\t"));
-        // Asumimos: [0]=número, [1]=matrícula, [2]=modelo
-        filas.slice(1).forEach(fila => {
-          const num = fila[0]?.trim();
-          if (num) {
-            busInfoMap.set(num, {
-              matricula: fila[1]?.trim() || "—",
-              modelo: fila[2]?.trim() || "—"
-            });
+        const lineas = text.split("\n");
+        lineas.forEach((linea) => {
+          const trimmed = linea.trim();
+          if (trimmed) {
+            const partes = trimmed.split(" - ");
+            if (partes.length >= 2) {
+              const numero = partes[0];
+              paradasMap.set(numero, trimmed);
+            }
           }
         });
       } catch (e) {
-        console.error("Error cargando busInfo:", e);
+        console.error(e);
+        alert("Error al cargar la lista de paradas.");
       }
     }
+
+    async function cargarDatosBuses() {
+      try {
+        const res = await fetch(
+          "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos_buses.tsv"
+        );
+        if (!res.ok) throw new Error("Error cargando datos de buses");
+        const text = await res.text();
+        const lineas = text.split("\n");
+        lineas.forEach((linea) => {
+          const [id, matricula, modelo] = linea.trim().split("\t");
+          if (id && matricula && modelo) {
+            datosBusMap.set(id, { matricula, modelo });
+          }
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    cargarParadas();
+    cargarDatosBuses();
 
     function extraerNumero(texto) {
       const m = texto.match(/\d+/);
       return m ? m[0] : null;
     }
 
-    // 3️⃣ Función principal de búsqueda y renderizado
     async function buscarBuses() {
       const inputRaw = document.getElementById("linea").value.trim();
       if (!inputRaw) return alert("Introduce un número de línea válido");
@@ -110,76 +142,86 @@
       const input = inputRaw.toUpperCase();
       const inputNum = extraerNumero(inputRaw);
 
-      // Limpia marcadores previos
-      markers.forEach(m => map.removeLayer(m));
+      markers.forEach((m) => map.removeLayer(m));
       markers = [];
 
       try {
-        const resp = await fetch("https://bizkaibus.onrender.com/bizkaibus");
-        const xmlText = await resp.text();
-        const xml = new DOMParser().parseFromString(xmlText, "application/xml");
-        const actividades = xml.getElementsByTagName("VehicleActivity");
+        const response = await fetch("https://bizkaibus.onrender.com/bizkaibus");
+        if (!response.ok) throw new Error("Error al descargar XML");
+        const xmlText = await response.text();
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+        const actividades = xmlDoc.getElementsByTagName("VehicleActivity");
+
         let encontrados = 0;
 
-        for (let act of actividades) {
-          const jref = act.querySelector("VehicleJourneyRef")?.textContent.trim().toUpperCase();
-          const vref = act.querySelector("VehicleRef")?.textContent.trim();
-          const lat = parseFloat(act.querySelector("Latitude")?.textContent);
-          const lon = parseFloat(act.querySelector("Longitude")?.textContent);
-          const sp = act.querySelector("StopPointRef")?.textContent.trim();
+        for (let actividad of actividades) {
+          const lineaTag = actividad.querySelector("VehicleJourneyRef");
+          const vehiculoTag = actividad.querySelector("VehicleRef");
+          const latTag = actividad.querySelector("Latitude");
+          const lonTag = actividad.querySelector("Longitude");
+          const stopPointTag = actividad.querySelector("StopPointRef");
 
-          if (!jref || !vref || isNaN(lat) || isNaN(lon)) continue;
+          if (lineaTag && vehiculoTag && latTag && lonTag) {
+            const rawLinea = lineaTag.textContent.trim().toUpperCase();
+            const matchLinea = rawLinea.match(/A\d{3,4}/);
+            const lineaLimpia = matchLinea ? matchLinea[0] : rawLinea;
+            const lineaNum = extraerNumero(lineaLimpia);
 
-          // Extrae A#### y número
-          const match = jref.match(/A\d{3,4}/);
-          const lineaLimpia = match ? match[0] : jref;
-          const lineaNum = extraerNumero(lineaLimpia);
-          const coincide = (
-            lineaLimpia === input ||
-            (inputNum && lineaNum === inputNum)
-          );
-          if (!coincide) continue;
+            const coincide =
+              lineaLimpia === input || (inputNum && lineaNum === inputNum);
 
-          // Nombre de parada
-          let paradaTexto = "Parada desconocida";
-          if (sp) {
-            const numSp = extraerNumero(sp);
-            if (numSp && paradasMap.has(numSp)) {
-              paradaTexto = paradasMap.get(numSp);
+            if (coincide) {
+              const lat = parseFloat(latTag.textContent);
+              const lon = parseFloat(lonTag.textContent);
+              const vehiculo = vehiculoTag.textContent;
+
+              let paradaTexto = "Parada desconocida";
+              if (stopPointTag) {
+                const spId = stopPointTag.textContent.trim();
+                const numMatch = spId.match(/\d+/);
+                if (numMatch) {
+                  const numParada = numMatch[0];
+                  if (paradasMap.has(numParada)) {
+                    paradaTexto = paradasMap.get(numParada);
+                  }
+                }
+              }
+
+              let extraDatos = "";
+              if (datosBusMap.has(vehiculo)) {
+                const d = datosBusMap.get(vehiculo);
+                extraDatos = `<br>Matrícula: ${d.matricula}<br>Modelo: ${d.modelo}`;
+              }
+
+              const marker = L.marker([lat, lon])
+                .addTo(map)
+                .bindPopup(
+                  `Bus: ${vehiculo}<br>Línea: ${lineaLimpia}<br>Parada: ${paradaTexto}${extraDatos}`
+                );
+              markers.push(marker);
+              encontrados++;
             }
           }
-
-          // Matrícula y modelo
-          const infoBus = busInfoMap.get(vref) || { matricula: "—", modelo: "—" };
-
-          // Marcador y popup
-          const marcador = L.marker([lat, lon]).addTo(map);
-          marcador.bindPopup(
-            `Bus: ${vref}<br>` +
-            `Línea: ${lineaLimpia}<br>` +
-            `Parada: ${paradaTexto}<br>` +
-            `Matrícula: ${infoBus.matricula}<br>` +
-            `Modelo: ${infoBus.modelo}`
-          );
-          markers.push(marcador);
-          encontrados++;
         }
 
-        if (!encontrados) {
+        if (encontrados === 0) {
           alert("No se encontraron buses para esa línea.");
         } else {
           map.setView(markers[0].getLatLng(), 13);
         }
-      } catch (e) {
-        console.error("Error en buscarBuses:", e);
-        alert("Error al descargar o procesar datos.");
+      } catch (err) {
+        console.error(err);
+        alert("Error al descargar XML");
       }
     }
 
-    // 4️⃣ Inicialización al cargar la página
-    window.onload = async () => {
-      await Promise.all([cargarParadas(), cargarBusInfo()]);
-    };
+    // Autoactualización cada 30 segundos
+    setInterval(() => {
+      if (document.getElementById("linea").value.trim()) {
+        buscarBuses();
+      }
+    }, 30000);
   </script>
 </body>
 </html>
