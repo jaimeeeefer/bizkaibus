@@ -174,12 +174,12 @@
           // Marcador y popup
           const marcador = L.marker([lat, lon]).addTo(map);
           marcador.bindPopup(`
-            <b>Línea:<b> ${lineaLimpia}<br>
-            <b>Parada:<b> ${paradaTexto}<br>
-            <b>Bus:<b> ${vref}<br>
-            <b>Matrícula:<b> ${infoBus.matricula}<br>
-            <b>Modelo:<b> ${infoBus.modelo}<br>
-            <b>Fecha matriculación:<b> ${infoBus.fecha}
+            <b>Línea:</b> ${lineaLimpia}<br>
+            <b>Parada:</b> ${paradaTexto}<br>
+            <b>Bus:</b> ${vref}<br>
+            <b>Matrícula:</b> ${infoBus.matricula}<br>
+            <b>Modelo:</b> ${infoBus.modelo}<br>
+            <b>Fecha matriculación:</b> ${infoBus.fecha}
           `);
           markers.push(marcador);
           encontrados++;
