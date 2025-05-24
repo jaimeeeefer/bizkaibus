@@ -9,11 +9,43 @@
     body {
       font-family: sans-serif;
       text-align: center;
-      padding: 1em;
+      padding: 0;
       margin: 0;
+    }
+
+    #login-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.7);
       display: flex;
-      flex-direction: column;
+      justify-content: center;
       align-items: center;
+      z-index: 9999;
+    }
+
+    #login-box {
+      background: white;
+      padding: 2em;
+      border-radius: 8px;
+      text-align: left;
+      box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    }
+
+    #login-box input {
+      width: 100%;
+      padding: 0.5em;
+      margin-bottom: 1em;
+      font-size: 1em;
+    }
+
+    #login-box button {
+      width: 100%;
+      padding: 0.7em;
+      font-size: 1em;
+      cursor: pointer;
     }
 
     #controls {
@@ -23,21 +55,15 @@
       justify-content: center;
       align-items: center;
       gap: 0.5em;
-      margin-bottom: 1em;
+      margin: 1em;
     }
 
-    input {
+    #controls input {
       padding: 0.5em;
       font-size: 1em;
       width: 300px;
       max-width: 90vw;
       box-sizing: border-box;
-    }
-
-    button {
-      padding: 0.5em 1em;
-      font-size: 1em;
-      cursor: pointer;
     }
 
     #map {
@@ -48,6 +74,16 @@
   </style>
 </head>
 <body>
+  <!-- Login modal -->
+  <div id="login-modal">
+    <div id="login-box">
+      <h2>Iniciar sesión</h2>
+      <input type="text" id="usuario" placeholder="Usuario" />
+      <input type="password" id="contrasena" placeholder="Contraseña" />
+      <button onclick="verificarCredenciales()">Entrar</button>
+    </div>
+  </div>
+
   <h1>Localizador de Autobuses Bizkaibus</h1>
   <div id="controls">
     <input type="text" id="linea" placeholder="Introduce nº de línea (ej: A3935 o 3935)" />
@@ -56,21 +92,23 @@
   <div id="map"></div>
 
   <script>
-    // Autenticación básica por prompt
-    const USUARIO = "admin";
-    const CONTRASENA = "bizkaibus123";
+    const CREDENCIALES = {
+      usuario: "admin",
+      contrasena: "bizkaibus123"
+    };
 
-    function autenticar() {
-      const u = prompt("Usuario:");
-      const p = prompt("Contraseña:");
-      if (u !== USUARIO || p !== CONTRASENA) {
-        alert("Acceso denegado.");
-        document.body.innerHTML = "<h1>401 No autorizado</h1>";
-        throw new Error("Acceso denegado");
+    function verificarCredenciales() {
+      const usuario = document.getElementById("usuario").value;
+      const contrasena = document.getElementById("contrasena").value;
+      if (
+        usuario === CREDENCIALES.usuario &&
+        contrasena === CREDENCIALES.contrasena
+      ) {
+        document.getElementById("login-modal").style.display = "none";
+      } else {
+        alert("Usuario o contraseña incorrectos.");
       }
     }
-
-    autenticar();
   </script>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -215,13 +253,6 @@
         alert("Error al descargar XML");
       }
     }
-
-    // Autoactualización cada 30 segundos
-    setInterval(() => {
-      if (document.getElementById("linea").value.trim()) {
-        buscarBuses();
-      }
-    }, 30000);
   </script>
 </body>
 </html>
