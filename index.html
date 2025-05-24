@@ -43,14 +43,14 @@
     #map {
       height: 80vh;
       width: 100%;
-      max-width: 2000px;
+      max-width: 1750px;
     }
   </style>
 </head>
 <body>
   <h1>Localizador de Autobuses Bizkaibus</h1>
   <div id="controls">
-    <input type="text" id="linea" placeholder="Introduce nº de línea (ej: A3935)" />
+    <input type="text" id="linea" placeholder="Introduce nº de línea (ej: A3935 o 3935)" />
     <button onclick="buscarBuses()">Buscar</button>
   </div>
   <div id="map"></div>
@@ -65,7 +65,6 @@
     let markers = [];
     let paradasMap = new Map();
 
-    // Carga las paradas desde el archivo texto y crea el mapa
     async function cargarParadas() {
       try {
         const res = await fetch(
@@ -77,7 +76,6 @@
         lineas.forEach((linea) => {
           const trimmed = linea.trim();
           if (trimmed) {
-            // Suponemos formato: "1 - NOMBRE PARADA"
             const partes = trimmed.split(" - ");
             if (partes.length >= 2) {
               const numero = partes[0];
@@ -91,14 +89,20 @@
       }
     }
 
-    // Ejecutamos la carga al inicio
     cargarParadas();
 
-    async function buscarBuses() {
-      const linea = document.getElementById("linea").value.trim().toUpperCase();
-      if (!linea) return alert("Introduce un número de línea válido");
+    function extraerNumero(texto) {
+      const m = texto.match(/\d+/);
+      return m ? m[0] : null;
+    }
 
-      // Elimina marcadores anteriores
+    async function buscarBuses() {
+      const inputRaw = document.getElementById("linea").value.trim();
+      if (!inputRaw) return alert("Introduce un número de línea válido");
+
+      const input = inputRaw.toUpperCase();
+      const inputNum = extraerNumero(inputRaw);
+
       markers.forEach((m) => map.removeLayer(m));
       markers = [];
 
@@ -121,10 +125,15 @@
 
           if (lineaTag && vehiculoTag && latTag && lonTag) {
             const rawLinea = lineaTag.textContent.trim().toUpperCase();
-            const match = rawLinea.match(/A\d{3,4}/);
-            const lineaLimpia = match ? match[0] : rawLinea;
+            const matchLinea = rawLinea.match(/A\d{3,4}/);
+            const lineaLimpia = matchLinea ? matchLinea[0] : rawLinea;
+            const lineaNum = extraerNumero(lineaLimpia);
 
-            if (lineaLimpia === linea) {
+            // Match si input coincide con código completo o sólo número
+            const coincide =
+              lineaLimpia === input || (inputNum && lineaNum === inputNum);
+
+            if (coincide) {
               const lat = parseFloat(latTag.textContent);
               const lon = parseFloat(lonTag.textContent);
               const vehiculo = vehiculoTag.textContent;
@@ -132,9 +141,6 @@
               let paradaTexto = "Parada desconocida";
               if (stopPointTag) {
                 const spId = stopPointTag.textContent.trim();
-                // Intentamos buscar si el spId incluye un número de parada, para enlazarlo
-                // Aquí asumimos que el ID de parada contiene el número como prefijo (ej: "1" o "01")
-                // Por si acaso, intentamos extraer números del spId:
                 const numMatch = spId.match(/\d+/);
                 if (numMatch) {
                   const numParada = numMatch[0];
