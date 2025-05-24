@@ -9,79 +9,58 @@
     body {
       font-family: sans-serif;
       text-align: center;
-      padding: 0;
+      padding: 1em;
       margin: 0;
-    }
-
-    #login-modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(0, 0, 0, 0.7);
       display: flex;
-      justify-content: center;
+      flex-direction: column;
       align-items: center;
-      z-index: 9999;
     }
-
-    #login-box {
-      background: white;
-      padding: 2em;
-      border-radius: 8px;
-      text-align: left;
-      box-shadow: 0 0 20px rgba(0,0,0,0.5);
-    }
-
-    #login-box input {
-      width: 100%;
-      padding: 0.5em;
-      margin-bottom: 1em;
-      font-size: 1em;
-    }
-
-    #login-box button {
-      width: 100%;
-      padding: 0.7em;
-      font-size: 1em;
-      cursor: pointer;
-    }
-
     #controls {
       display: flex;
-      flex-direction: row;
       flex-wrap: wrap;
       justify-content: center;
-      align-items: center;
       gap: 0.5em;
-      margin: 1em;
+      margin-bottom: 1em;
     }
-
-    #controls input {
+    input {
       padding: 0.5em;
       font-size: 1em;
       width: 300px;
       max-width: 90vw;
       box-sizing: border-box;
     }
-
+    button {
+      padding: 0.5em 1em;
+      font-size: 1em;
+      cursor: pointer;
+    }
     #map {
       height: 80vh;
       width: 100%;
       max-width: 1750px;
     }
+    #login {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
   </style>
 </head>
 <body>
-  <!-- Login modal -->
-  <div id="login-modal">
-    <div id="login-box">
-      <h2>Iniciar sesión</h2>
-      <input type="text" id="usuario" placeholder="Usuario" />
-      <input type="password" id="contrasena" placeholder="Contraseña" />
-      <button onclick="verificarCredenciales()">Entrar</button>
-    </div>
+  <div id="login">
+    <h2>Iniciar sesión</h2>
+    <input type="text" id="usuario" placeholder="Usuario" />
+    <input type="password" id="contrasena" placeholder="Contraseña" />
+    <button onclick="verificarLogin()">Entrar</button>
+    <p id="error" style="color:red;"></p>
   </div>
 
   <h1>Localizador de Autobuses Bizkaibus</h1>
@@ -91,28 +70,28 @@
   </div>
   <div id="map"></div>
 
-  <script>
-    const CREDENCIALES = {
-      usuario: "admin",
-      contrasena: "bizkaibus123"
-    };
-
-    function verificarCredenciales() {
-      const usuario = document.getElementById("usuario").value;
-      const contrasena = document.getElementById("contrasena").value;
-      if (
-        usuario === CREDENCIALES.usuario &&
-        contrasena === CREDENCIALES.contrasena
-      ) {
-        document.getElementById("login-modal").style.display = "none";
-      } else {
-        alert("Usuario o contraseña incorrectos.");
-      }
-    }
-  </script>
-
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
+    // Login simple
+    function verificarLogin() {
+      const usuario = document.getElementById("usuario").value;
+      const contrasena = document.getElementById("contrasena").value;
+
+      // Cambia estas credenciales según necesites
+      const USUARIO_CORRECTO = "admin";
+      const CONTRASENA_CORRECTA = "1234";
+
+      if (usuario === USUARIO_CORRECTO && contrasena === CONTRASENA_CORRECTA) {
+        document.getElementById("login").style.display = "none";
+      } else {
+        document.getElementById("error").textContent = "Usuario o contraseña incorrectos.";
+      }
+    }
+
+    // URL de tu hoja publicada como TSV
+    const SHEET_TSV_URL =
+      "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYeZkna4mwxp3p2azwTgAPcjeSBoUU_rhWW5gVZ7hqotNtojQOHtsjbEnnlJbrijBVwck_kWERE__6/pub?output=tsv";
+
     let map = L.map("map").setView([43.25, -2.93], 10);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OpenStreetMap",
@@ -120,53 +99,43 @@
 
     let markers = [];
     let paradasMap = new Map();
-    let datosBusMap = new Map();
+    let busInfoMap = new Map(); // VehicleRef → { matricula, modelo }
 
     async function cargarParadas() {
       try {
         const res = await fetch(
           "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/paradas"
         );
-        if (!res.ok) throw new Error("Error cargando archivo de paradas");
         const text = await res.text();
-        const lineas = text.split("\n");
-        lineas.forEach((linea) => {
-          const trimmed = linea.trim();
-          if (trimmed) {
-            const partes = trimmed.split(" - ");
-            if (partes.length >= 2) {
-              const numero = partes[0];
-              paradasMap.set(numero, trimmed);
-            }
-          }
+        text.split("\n").forEach(linea => {
+          const t = linea.trim();
+          if (!t) return;
+          const partes = t.split(" - ");
+          if (partes.length >= 2) paradasMap.set(partes[0], t);
         });
       } catch (e) {
-        console.error(e);
-        alert("Error al cargar la lista de paradas.");
+        console.error("Error cargando paradas:", e);
       }
     }
 
-    async function cargarDatosBuses() {
+    async function cargarBusInfo() {
       try {
-        const res = await fetch(
-          "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos_buses.tsv"
-        );
-        if (!res.ok) throw new Error("Error cargando datos de buses");
-        const text = await res.text();
-        const lineas = text.split("\n");
-        lineas.forEach((linea) => {
-          const [id, matricula, modelo] = linea.trim().split("\t");
-          if (id && matricula && modelo) {
-            datosBusMap.set(id, { matricula, modelo });
+        const res = await fetch(SHEET_TSV_URL);
+        const tsv = await res.text();
+        const filas = tsv.trim().split("\n").map(r => r.split("\t"));
+        filas.slice(1).forEach(fila => {
+          const num = fila[0]?.trim();
+          if (num) {
+            busInfoMap.set(num, {
+              matricula: fila[1]?.trim() || "—",
+              modelo: fila[2]?.trim() || "—"
+            });
           }
         });
       } catch (e) {
-        console.error(e);
+        console.error("Error cargando busInfo:", e);
       }
     }
-
-    cargarParadas();
-    cargarDatosBuses();
 
     function extraerNumero(texto) {
       const m = texto.match(/\d+/);
@@ -180,79 +149,70 @@
       const input = inputRaw.toUpperCase();
       const inputNum = extraerNumero(inputRaw);
 
-      markers.forEach((m) => map.removeLayer(m));
+      markers.forEach(m => map.removeLayer(m));
       markers = [];
 
       try {
-        const response = await fetch("https://bizkaibus.onrender.com/bizkaibus");
-        if (!response.ok) throw new Error("Error al descargar XML");
-        const xmlText = await response.text();
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(xmlText, "application/xml");
-        const actividades = xmlDoc.getElementsByTagName("VehicleActivity");
-
+        const resp = await fetch("https://bizkaibus.onrender.com/bizkaibus");
+        const xmlText = await resp.text();
+        const xml = new DOMParser().parseFromString(xmlText, "application/xml");
+        const actividades = xml.getElementsByTagName("VehicleActivity");
         let encontrados = 0;
 
-        for (let actividad of actividades) {
-          const lineaTag = actividad.querySelector("VehicleJourneyRef");
-          const vehiculoTag = actividad.querySelector("VehicleRef");
-          const latTag = actividad.querySelector("Latitude");
-          const lonTag = actividad.querySelector("Longitude");
-          const stopPointTag = actividad.querySelector("StopPointRef");
+        for (let act of actividades) {
+          const jref = act.querySelector("VehicleJourneyRef")?.textContent.trim().toUpperCase();
+          const vref = act.querySelector("VehicleRef")?.textContent.trim();
+          const lat = parseFloat(act.querySelector("Latitude")?.textContent);
+          const lon = parseFloat(act.querySelector("Longitude")?.textContent);
+          const sp = act.querySelector("StopPointRef")?.textContent.trim();
 
-          if (lineaTag && vehiculoTag && latTag && lonTag) {
-            const rawLinea = lineaTag.textContent.trim().toUpperCase();
-            const matchLinea = rawLinea.match(/A\d{3,4}/);
-            const lineaLimpia = matchLinea ? matchLinea[0] : rawLinea;
-            const lineaNum = extraerNumero(lineaLimpia);
+          if (!jref || !vref || isNaN(lat) || isNaN(lon)) continue;
 
-            const coincide =
-              lineaLimpia === input || (inputNum && lineaNum === inputNum);
+          const match = jref.match(/A\d{3,4}/);
+          const lineaLimpia = match ? match[0] : jref;
+          const lineaNum = extraerNumero(lineaLimpia);
+          const coincide = (
+            lineaLimpia === input ||
+            (inputNum && lineaNum === inputNum)
+          );
+          if (!coincide) continue;
 
-            if (coincide) {
-              const lat = parseFloat(latTag.textContent);
-              const lon = parseFloat(lonTag.textContent);
-              const vehiculo = vehiculoTag.textContent;
-
-              let paradaTexto = "Parada desconocida";
-              if (stopPointTag) {
-                const spId = stopPointTag.textContent.trim();
-                const numMatch = spId.match(/\d+/);
-                if (numMatch) {
-                  const numParada = numMatch[0];
-                  if (paradasMap.has(numParada)) {
-                    paradaTexto = paradasMap.get(numParada);
-                  }
-                }
-              }
-
-              let extraDatos = "";
-              if (datosBusMap.has(vehiculo)) {
-                const d = datosBusMap.get(vehiculo);
-                extraDatos = `<br>Matrícula: ${d.matricula}<br>Modelo: ${d.modelo}`;
-              }
-
-              const marker = L.marker([lat, lon])
-                .addTo(map)
-                .bindPopup(
-                  `Bus: ${vehiculo}<br>Línea: ${lineaLimpia}<br>Parada: ${paradaTexto}${extraDatos}`
-                );
-              markers.push(marker);
-              encontrados++;
+          let paradaTexto = "Parada desconocida";
+          if (sp) {
+            const numSp = extraerNumero(sp);
+            if (numSp && paradasMap.has(numSp)) {
+              paradaTexto = paradasMap.get(numSp);
             }
           }
+
+          const infoBus = busInfoMap.get(vref) || { matricula: "—", modelo: "—" };
+
+          const marcador = L.marker([lat, lon]).addTo(map);
+          marcador.bindPopup(
+            `Bus: ${vref}<br>` +
+            `Línea: ${lineaLimpia}<br>` +
+            `Parada: ${paradaTexto}<br>` +
+            `Matrícula: ${infoBus.matricula}<br>` +
+            `Modelo: ${infoBus.modelo}`
+          );
+          markers.push(marcador);
+          encontrados++;
         }
 
-        if (encontrados === 0) {
+        if (!encontrados) {
           alert("No se encontraron buses para esa línea.");
         } else {
           map.setView(markers[0].getLatLng(), 13);
         }
-      } catch (err) {
-        console.error(err);
-        alert("Error al descargar XML");
+      } catch (e) {
+        console.error("Error en buscarBuses:", e);
+        alert("Error al descargar o procesar datos.");
       }
     }
+
+    window.onload = async () => {
+      await Promise.all([cargarParadas(), cargarBusInfo()]);
+    };
   </script>
 </body>
 </html>
