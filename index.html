@@ -45,9 +45,9 @@
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-    // --- CONFIGURA AQUÍ TU HOJA DE CÁLCULO ---
-    const SHEET_CSV_URL =
-      "https://docs.google.com/spreadsheets/d/1d7EWs2H_TNm_db51oOJcE3hjFLxMaA-Djt0iwsp8xwQ/gviz/tq?tqx=out:csv";
+    // URL de tu hoja publicada como TSV
+    const SHEET_TSV_URL =
+      "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYeZkna4mwxp3p2azwTgAPcjeSBoUU_rhWW5gVZ7hqotNtojQOHtsjbEnnlJbrijBVwck_kWERE__6/pub?output=tsv";
 
     let map = L.map("map").setView([43.25, -2.93], 10);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -56,9 +56,9 @@
 
     let markers = [];
     let paradasMap = new Map();
-    let busInfoMap = new Map(); // <VehicleRef> → { matricula, modelo }
+    let busInfoMap = new Map(); // VehicleRef → { matricula, modelo }
 
-    // Carga lista de paradas (igual que antes)
+    // 1️⃣ Cargar lista de paradas (igual que antes)
     async function cargarParadas() {
       try {
         const res = await fetch(
@@ -76,13 +76,13 @@
       }
     }
 
-    // Carga info de buses desde Google Sheets (CSV)
+    // 2️⃣ Cargar info de buses desde Google Sheet (TSV)
     async function cargarBusInfo() {
       try {
-        const res = await fetch(SHEET_CSV_URL);
-        const csv = await res.text();
-        const filas = csv.trim().split("\n").map(r => r.split(","));
-        // Suponemos: [0]=número, [1]=matrícula, [2]=modelo
+        const res = await fetch(SHEET_TSV_URL);
+        const tsv = await res.text();
+        const filas = tsv.trim().split("\n").map(r => r.split("\t"));
+        // Asumimos: [0]=número, [1]=matrícula, [2]=modelo
         filas.slice(1).forEach(fila => {
           const num = fila[0]?.trim();
           if (num) {
@@ -97,16 +97,16 @@
       }
     }
 
-    // Extrae dígitos de un texto
     function extraerNumero(texto) {
       const m = texto.match(/\d+/);
       return m ? m[0] : null;
     }
 
-    // Bucle principal de búsqueda y pintado
+    // 3️⃣ Función principal de búsqueda y renderizado
     async function buscarBuses() {
       const inputRaw = document.getElementById("linea").value.trim();
       if (!inputRaw) return alert("Introduce un número de línea válido");
+
       const input = inputRaw.toUpperCase();
       const inputNum = extraerNumero(inputRaw);
 
@@ -140,7 +140,7 @@
           );
           if (!coincide) continue;
 
-          // Determina nombre de parada
+          // Nombre de parada
           let paradaTexto = "Parada desconocida";
           if (sp) {
             const numSp = extraerNumero(sp);
@@ -149,10 +149,10 @@
             }
           }
 
-          // Obtiene matrícula y modelo del bus
+          // Matrícula y modelo
           const infoBus = busInfoMap.get(vref) || { matricula: "—", modelo: "—" };
 
-          // Crea marcador y popup
+          // Marcador y popup
           const marcador = L.marker([lat, lon]).addTo(map);
           marcador.bindPopup(
             `Bus: ${vref}<br>` +
@@ -176,7 +176,7 @@
       }
     }
 
-    // Inicialización
+    // 4️⃣ Inicialización al cargar la página
     window.onload = async () => {
       await Promise.all([cargarParadas(), cargarBusInfo()]);
     };
