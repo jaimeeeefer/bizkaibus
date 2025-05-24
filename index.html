@@ -23,71 +23,46 @@
       margin-bottom: 1em;
     }
     input {
-      padding: 0.5em;
-      font-size: 1em;
-      width: 300px;
-      max-width: 90vw;
-      box-sizing: border-box;
+      padding: 0.5em; font-size: 1em;
+      width: 300px; max-width: 90vw; box-sizing: border-box;
     }
     button {
-      padding: 0.5em 1em;
-      font-size: 1em;
-      cursor: pointer;
+      padding: 0.5em 1em; font-size: 1em; cursor: pointer;
     }
     #map {
       height: 80vh;
-      width: 100%;
-      max-width: 1750px;
-    }
-    #login {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: #fff;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 9999;
+      width: 100%; max-width: 1750px;
     }
   </style>
 </head>
 <body>
-  <div id="login">
-    <h2>Iniciar sesión</h2>
-    <input type="text" id="usuario" placeholder="Usuario" />
-    <input type="password" id="contrasena" placeholder="Contraseña" />
-    <button onclick="verificarLogin()">Entrar</button>
-    <p id="error" style="color:red;"></p>
-  </div>
-
   <h1>Localizador de Autobuses Bizkaibus</h1>
   <div id="controls">
     <input type="text" id="linea" placeholder="Introduce nº de línea (ej: A3935 o 3935)" />
     <button onclick="buscarBuses()">Buscar</button>
   </div>
   <div id="map"></div>
-
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  
   <script>
-    // Login simple
-    function verificarLogin() {
-      const usuario = document.getElementById("usuario").value;
-      const contrasena = document.getElementById("contrasena").value;
+    // Autenticación básica por prompt
+    const USUARIO = "admin";
+    const CONTRASENA = "bizkaibus123";
 
-      // Cambia estas credenciales según necesites
-      const USUARIO_CORRECTO = "admin";
-      const CONTRASENA_CORRECTA = "1234";
-
-      if (usuario === USUARIO_CORRECTO && contrasena === CONTRASENA_CORRECTA) {
-        document.getElementById("login").style.display = "none";
-      } else {
-        document.getElementById("error").textContent = "Usuario o contraseña incorrectos.";
+    function autenticar() {
+      const u = prompt("Usuario:");
+      const p = prompt("Contraseña:");
+      if (u !== USUARIO || p !== CONTRASENA) {
+        alert("Acceso denegado.");
+        document.body.innerHTML = "<h1>401 No autorizado</h1>";
+        throw new Error("Acceso denegado");
       }
     }
 
+    autenticar();
+  </script>
+  
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
     // URL de tu hoja publicada como TSV
     const SHEET_TSV_URL =
       "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYeZkna4mwxp3p2azwTgAPcjeSBoUU_rhWW5gVZ7hqotNtojQOHtsjbEnnlJbrijBVwck_kWERE__6/pub?output=tsv";
@@ -101,6 +76,7 @@
     let paradasMap = new Map();
     let busInfoMap = new Map(); // VehicleRef → { matricula, modelo }
 
+    // 1️⃣ Cargar lista de paradas (igual que antes)
     async function cargarParadas() {
       try {
         const res = await fetch(
@@ -118,11 +94,13 @@
       }
     }
 
+    // 2️⃣ Cargar info de buses desde Google Sheet (TSV)
     async function cargarBusInfo() {
       try {
         const res = await fetch(SHEET_TSV_URL);
         const tsv = await res.text();
         const filas = tsv.trim().split("\n").map(r => r.split("\t"));
+        // Asumimos: [0]=número, [1]=matrícula, [2]=modelo
         filas.slice(1).forEach(fila => {
           const num = fila[0]?.trim();
           if (num) {
@@ -142,6 +120,7 @@
       return m ? m[0] : null;
     }
 
+    // 3️⃣ Función principal de búsqueda y renderizado
     async function buscarBuses() {
       const inputRaw = document.getElementById("linea").value.trim();
       if (!inputRaw) return alert("Introduce un número de línea válido");
@@ -149,6 +128,7 @@
       const input = inputRaw.toUpperCase();
       const inputNum = extraerNumero(inputRaw);
 
+      // Limpia marcadores previos
       markers.forEach(m => map.removeLayer(m));
       markers = [];
 
@@ -168,6 +148,7 @@
 
           if (!jref || !vref || isNaN(lat) || isNaN(lon)) continue;
 
+          // Extrae A#### y número
           const match = jref.match(/A\d{3,4}/);
           const lineaLimpia = match ? match[0] : jref;
           const lineaNum = extraerNumero(lineaLimpia);
@@ -177,6 +158,7 @@
           );
           if (!coincide) continue;
 
+          // Nombre de parada
           let paradaTexto = "Parada desconocida";
           if (sp) {
             const numSp = extraerNumero(sp);
@@ -185,15 +167,17 @@
             }
           }
 
+          // Matrícula y modelo
           const infoBus = busInfoMap.get(vref) || { matricula: "—", modelo: "—" };
 
+          // Marcador y popup
           const marcador = L.marker([lat, lon]).addTo(map);
           marcador.bindPopup(
-            `Bus: ${vref}<br>` +
-            `Línea: ${lineaLimpia}<br>` +
-            `Parada: ${paradaTexto}<br>` +
-            `Matrícula: ${infoBus.matricula}<br>` +
-            `Modelo: ${infoBus.modelo}`
+            Bus: ${vref}<br> +
+            Línea: ${lineaLimpia}<br> +
+            Parada: ${paradaTexto}<br> +
+            Matrícula: ${infoBus.matricula}<br> +
+            Modelo: ${infoBus.modelo}
           );
           markers.push(marcador);
           encontrados++;
@@ -210,6 +194,7 @@
       }
     }
 
+    // 4️⃣ Inicialización al cargar la página
     window.onload = async () => {
       await Promise.all([cargarParadas(), cargarBusInfo()]);
     };
