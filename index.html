@@ -49,15 +49,21 @@
     const CONTRASENA = "bizkaibus123";
 
     function autenticar() {
-      const u = prompt("Usuario:");
-      const p = prompt("Contraseña:");
-      if (u !== USUARIO || p !== CONTRASENA) {
-        alert("Acceso denegado.");
-        document.body.innerHTML = "<h1>401 No autorizado</h1>";
-        throw new Error("Acceso denegado");
-      }
-    }
+      const yaAutenticado = localStorage.getItem("autenticado");
 
+        if (yaAutenticado === "true") return; // Ya autenticado, no pedir credenciales
+
+          const u = prompt("Usuario:");
+          const p = prompt("Contraseña:");
+
+          if (u === USUARIO && p === CONTRASENA) {
+            localStorage.setItem("autenticado", "true"); // Guardar que se autenticó correctamente
+          } else {
+            alert("Acceso denegado.");
+            document.body.innerHTML = "<h1>401 No autorizado</h1>";
+            throw new Error("Acceso denegado");
+          }
+        }
     autenticar();
   </script>
   
