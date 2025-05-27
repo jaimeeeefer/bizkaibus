@@ -118,7 +118,7 @@
         console.log("Autenticación exitosa (nueva).");
       } else {
         alert("Acceso denegado. Recarga la página para intentarlo de nuevo.");
-        document.body.innerHTML = "<h1>401 No autorizado</h1><p>Por favor, recarga la página e introduce las credenciales correctas (usuario: admin, contraseña: bizkaibus123).</p>";
+        document.body.innerHTML = "<h1>401 No autorizado</h1><p>Por favor, recarga la página e introduce las credenciales correctas.</p>";
         throw new Error("Acceso denegado");
       }
     }
