@@ -33,13 +33,67 @@
       height: 80vh;
       width: 100%; max-width: 1750px;
     }
+    #stop-results {
+      margin-top: 1em;
+      width: 100%;
+      max-width: 1750px;
+      text-align: left;
+    }
+    #stop-results h2 {
+      margin-top: 0;
+    }
+    .bus-option {
+      background-color: #f0f0f0;
+      border: 1px solid #ddd;
+      padding: 0.5em;
+      margin-bottom: 0.5em;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .bus-option:hover {
+      background-color: #e0e0e0;
+    }
+    .bus-option span {
+      font-weight: bold;
+    }
+    #route-details {
+      margin-top: 1em;
+      width: 100%;
+      max-width: 1750px;
+      text-align: left;
+      border: 1px solid #ccc;
+      padding: 1em;
+      box-sizing: border-box;
+    }
+    #route-details ul {
+      list-style-type: none;
+      padding: 0;
+    }
+    #route-details li {
+      margin-bottom: 0.2em;
+    }
   </style>
 </head>
 <body>
   <h1>Localizador de Autobuses Bizkaibus</h1>
   <div id="controls">
     <input type="text" id="linea" placeholder="Introduce nº de línea (ej: A3935 o 3935)" />
-    <button onclick="buscarBuses()">Buscar</button>
+    <button onclick="buscarBusesPorLinea()">Buscar Línea</button>
+    <input type="text" id="parada" placeholder="Introduce nº de parada (ej: 123)" />
+    <button onclick="buscarBusesPorParada()">Buscar Parada</button>
+    <input type="text" id="numBus" placeholder="Introduce nº de bus (ej: 1514)" />
+    <button onclick="buscarBusPorNumero()">Buscar Bus</button>
+  </div>
+  <div id="stop-results">
+    <h2>Próximos autobuses en la parada:</h2>
+    <div id="bus-list"></div>
+  </div>
+  <div id="route-details" style="display: none;">
+    <h2>Detalles del recorrido: <span id="route-line-name"></span></h2>
+    <p>Dirección: <span id="route-headsign"></span></p>
+    <ul id="route-stop-list"></ul>
   </div>
   <div id="map"></div>
   
@@ -51,27 +105,39 @@
     function autenticar() {
       const yaAutenticado = localStorage.getItem("autenticado");
 
-        if (yaAutenticado === "true") return; // Ya autenticado, no pedir credenciales
+      if (yaAutenticado === "true") {
+        console.log("Autenticación exitosa (desde localStorage).");
+        return;
+      }
 
-          const u = prompt("Usuario:");
-          const p = prompt("Contraseña:");
+      const u = prompt("Usuario:");
+      const p = prompt("Contraseña:");
 
-          if (u === USUARIO && p === CONTRASENA) {
-            localStorage.setItem("autenticado", "true"); // Guardar que se autenticó correctamente
-          } else {
-            alert("Acceso denegado.");
-            document.body.innerHTML = "<h1>401 No autorizado</h1>";
-            throw new Error("Acceso denegado");
-          }
-        }
+      if (u === USUARIO && p === CONTRASENA) {
+        localStorage.setItem("autenticado", "true");
+        console.log("Autenticación exitosa (nueva).");
+      } else {
+        alert("Acceso denegado. Recarga la página para intentarlo de nuevo.");
+        document.body.innerHTML = "<h1>401 No autorizado</h1><p>Por favor, recarga la página e introduce las credenciales correctas (usuario: admin, contraseña: bizkaibus123).</p>";
+        throw new Error("Acceso denegado");
+      }
+    }
     autenticar();
   </script>
   
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
     // URL de tu hoja publicada como TSV
-    const SHEET_TSV_URL =
-      "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYeZkna4mwxp3p2azwTgAPcjeSBoUU_rhWW5gVZ7hqotNtojQOHtsjbEnnlJbrijBVwck_kWERE__6/pub?output=tsv";
+    const SHEET_TSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYeZkna4mwxp3p2azwTgAPcjeSBoUU_rhWW5gVZ7hqotTtojQOHtsjbEnnlJbrijBVwck_kWERE__6/pub?output=tsv"; // URL ACTUALIZADA
+
+    // URLs de los archivos GTFS proporcionados por el usuario
+    const STOPS_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibusparadas/main/stops.txt";
+    const STOP_TIMES1_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibusparadas/main/stop_times1.txt";
+    const STOP_TIMES2_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibusparadas/main/stop_times2.txt";
+    const STOP_TIMES3_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibusparadas/main/stop_times3.txt";
+    const TRIPS_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibusparadas/main/trips.txt";
+    const CALENDAR_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibusparadas/main/calendar.txt";
+    const CALENDAR_DATES_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibusparadas/main/calendar_dates.txt";
 
     let map = L.map("map").setView([43.25, -2.93], 10);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -79,34 +145,135 @@
     }).addTo(map);
 
     let markers = [];
-    let paradasMap = new Map();
-    let busInfoMap = new Map(); // VehicleRef → { matricula, modelo }
+    let stopMarkers = []; // Separar marcadores de parada para borrar selectivamente
+    let realTimeBusMarker = null; // Para el marcador del bus en tiempo real
+    let linePolylines = [];
 
-    // 1️⃣ Cargar lista de paradas (igual que antes)
-    async function cargarParadas() {
+    let stopsData = new Map();
+    let busInfoMap = new Map();
+    let stopTimesData = [];
+    let tripsData = new Map();
+    let calendarData = new Map();
+    let calendarDatesData = new Map();
+
+    const COLORS = ['#FF0000', '#0000FF', '#008000', '#FFA500', '#800080', '#00FFFF', '#FF00FF', '#808080'];
+
+    // Icono personalizado para el autobús en tiempo real
+    const busIcon = L.icon({
+        iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png', // Marcador rojo base
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', // Sombra
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    });
+    
+    async function cargarDatosGTFS() {
       try {
-        const res = await fetch(
-          "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/paradas"
-        );
-        const text = await res.text();
-        text.split("\n").forEach(linea => {
-          const t = linea.trim();
-          if (!t) return;
-          const partes = t.split(" - ");
-          if (partes.length >= 2) paradasMap.set(partes[0], t);
+        console.log("Iniciando carga de stops.txt desde:", STOPS_URL);
+        const resStops = await fetch(STOPS_URL);
+        const textStops = await resStops.text();
+        const rowsStops = textStops.trim().split("\n").map(row => row.split(","));
+        
+        rowsStops.slice(1).forEach(row => {
+          const stop_id = row[0]?.trim();
+          if (stop_id && row.length >= 6) { 
+              stopsData.set(stop_id, {
+                stop_name: row[2]?.trim(),
+                stop_lat: parseFloat(row[4]),
+                stop_lon: parseFloat(row[5]),
+              });
+          } else {
+              console.warn("Skipping malformed or incomplete row in stops.txt:", row);
+          }
         });
+        console.log("stopsData map size after loading:", stopsData.size);
+
+        const stopTimesPromises = [
+            fetch(STOP_TIMES1_URL).then(res => res.text()),
+            fetch(STOP_TIMES2_URL).then(res => res.text()),
+            fetch(STOP_TIMES3_URL).then(res => res.text())
+        ];
+        const stopTimesTexts = await Promise.all(stopTimesPromises);
+
+        stopTimesTexts.forEach(text => {
+            const rowsStopTimes = text.trim().split("\n").map(row => row.split(","));
+            rowsStopTimes.slice(1).forEach(row => {
+                if (row.length >= 5) {
+                    stopTimesData.push({
+                        trip_id: row[0]?.trim(),
+                        arrival_time: row[1]?.trim(),
+                        departure_time: row[2]?.trim(),
+                        stop_id: row[3]?.trim(),
+                        stop_sequence: parseInt(row[4]),
+                    });
+                }
+            });
+        });
+        console.log("Total stopTimes loaded:", stopTimesData.length);
+
+        const resTrips = await fetch(TRIPS_URL);
+        const textTrips = await resTrips.text();
+        const rowsTrips = textTrips.trim().split("\n").map(row => row.split(","));
+        rowsTrips.slice(1).forEach(row => {
+          if (row.length >= 8) {
+              tripsData.set(row[2]?.trim(), {
+                route_id: row[0]?.trim(),
+                service_id: row[1]?.trim(),
+                trip_headsign: row[3]?.trim(),
+                shape_id: row[7]?.trim(),
+              });
+          }
+        });
+        console.log("Total trips loaded:", tripsData.size);
+
+        const resCalendar = await fetch(CALENDAR_URL);
+        const textCalendar = await resCalendar.text();
+        const rowsCalendar = textCalendar.trim().split("\n").map(row => row.split(","));
+        rowsCalendar.slice(1).forEach(row => {
+            if (row.length >= 10) {
+                calendarData.set(row[0]?.trim(), {
+                    monday: parseInt(row[1]),
+                    tuesday: parseInt(row[2]),
+                    wednesday: parseInt(row[3]),
+                    thursday: parseInt(row[4]),
+                    friday: parseInt(row[5]),
+                    saturday: parseInt(row[6]),
+                    sunday: parseInt(row[7]),
+                    start_date: row[8]?.trim(),
+                    end_date: row[9]?.trim()
+                });
+            }
+        });
+        console.log("Total calendar services loaded:", calendarData.size);
+
+        const resCalendarDates = await fetch(CALENDAR_DATES_URL);
+        const textCalendarDates = await resCalendarDates.text();
+        const rowsCalendarDates = textCalendarDates.trim().split("\n").map(row => row.split(","));
+        rowsCalendarDates.slice(1).forEach(row => {
+            if (row.length >= 3) {
+                const service_id = row[0]?.trim();
+                const date = row[1]?.trim();
+                const exception_type = parseInt(row[2]);
+
+                if (!calendarDatesData.has(service_id)) {
+                    calendarDatesData.set(service_id, new Map());
+                }
+                calendarDatesData.get(service_id).set(date, exception_type);
+            }
+        });
+        console.log("Total calendar_dates loaded (unique service_id with exceptions):", calendarDatesData.size);
+
       } catch (e) {
-        console.error("Error cargando paradas:", e);
+        console.error("Error cargando datos GTFS:", e);
       }
     }
 
-    // 2️⃣ Cargar info de buses desde Google Sheet (TSV)
     async function cargarBusInfo() {
       try {
         const res = await fetch(SHEET_TSV_URL);
         const tsv = await res.text();
         const filas = tsv.trim().split("\n").map(r => r.split("\t"));
-        // Asumimos: [0]=número, [1]=matrícula, [2]=modelo
         filas.slice(1).forEach(fila => {
           const num = fila[0]?.trim();
           if (num) {
@@ -117,27 +284,67 @@
             });
           }
         });
+        console.log("Total bus info loaded:", busInfoMap.size);
+
       } catch (e) {
         console.error("Error cargando busInfo:", e);
       }
     }
+
+    // Función auxiliar para obtener el nombre de la parada sin el ID duplicado
+    function getCleanStopName(stopId) {
+        const stopInfo = stopsData.get(stopId);
+        if (stopInfo) {
+            // Eliminar el último grupo de paréntesis con números si existe y coincide con el stopId
+            const name = stopInfo.stop_name;
+            const regex = new RegExp(`\\s*\\(${stopId}\\)$`);
+            return name.replace(regex, '');
+        }
+        return "Desconocida";
+    }
+
 
     function extraerNumero(texto) {
       const m = texto.match(/\d+/);
       return m ? m[0] : null;
     }
 
-    // 3️⃣ Función principal de búsqueda y renderizado
-    async function buscarBuses() {
+    function clearMapElements() {
+        // Limpiar solo los marcadores de bus en tiempo real
+        if (realTimeBusMarker) {
+            map.removeLayer(realTimeBusMarker);
+            realTimeBusMarker = null;
+        }
+        // Limpiar todas las líneas
+        linePolylines.forEach(poly => map.removeLayer(poly));
+        linePolylines = [];
+        // Limpiar marcadores de paradas
+        stopMarkers.forEach(m => map.removeLayer(m));
+        stopMarkers = [];
+        // No borramos 'markers' aquí porque 'buscarBusesPorLinea' lo gestiona
+        // y este 'clearMapElements' se llama desde 'mostrarRecorrido' y 'buscarBusesPorParada'.
+    }
+    
+    // Función para limpiar solo los marcadores de la búsqueda de línea (buses en tiempo real de línea)
+    function clearLineSearchMarkers() {
+        markers.forEach(m => map.removeLayer(m));
+        markers = []; // Reiniciar el array de marcadores de línea
+    }
+
+
+    async function buscarBusesPorLinea() {
       const inputRaw = document.getElementById("linea").value.trim();
       if (!inputRaw) return alert("Introduce un número de línea válido");
 
       const input = inputRaw.toUpperCase();
       const inputNum = extraerNumero(inputRaw);
 
-      // Limpia marcadores previos
-      markers.forEach(m => map.removeLayer(m));
-      markers = [];
+      // Limpia todo para la nueva búsqueda de línea
+      clearMapElements(); // Limpia paradas, recorridos y bus en tiempo real
+      clearLineSearchMarkers(); // Limpia los marcadores de línea anteriores
+
+      document.getElementById('stop-results').style.display = 'none';
+      document.getElementById('route-details').style.display = 'none';
 
       try {
         const resp = await fetch("https://bizkaibus.onrender.com/bizkaibus");
@@ -145,6 +352,7 @@
         const xml = new DOMParser().parseFromString(xmlText, "application/xml");
         const actividades = xml.getElementsByTagName("VehicleActivity");
         let encontrados = 0;
+        let bounds = new L.LatLngBounds();
 
         for (let act of actividades) {
           const jref = act.querySelector("VehicleJourneyRef")?.textContent.trim().toUpperCase();
@@ -155,7 +363,6 @@
 
           if (!jref || !vref || isNaN(lat) || isNaN(lon)) continue;
 
-          // Extrae A#### y número
           const match = jref.match(/A\d{3,4}/);
           const lineaLimpia = match ? match[0] : jref;
           const lineaNum = extraerNumero(lineaLimpia);
@@ -165,46 +372,373 @@
           );
           if (!coincide) continue;
 
-          // Nombre de parada
-          let paradaTexto = "Parada desconocida";
-          if (sp) {
-            const numSp = extraerNumero(sp);
-            if (numSp && paradasMap.has(numSp)) {
-              paradaTexto = paradasMap.get(numSp);
-            }
-          }
+          // Usar la función auxiliar para limpiar el nombre de la parada
+          const paradaTexto = getCleanStopName(sp);
 
-          // Matrícula y modelo
           const infoBus = busInfoMap.get(vref) || { matricula: "—", modelo: "—", fecha: "—"};
 
-          // Marcador y popup
           const marcador = L.marker([lat, lon]).addTo(map);
           marcador.bindPopup(`
             <b>Línea:</b> ${lineaLimpia}<br>
-            <b>Parada:</b> ${paradaTexto}<br>
+            <b>Parada:</b> ${paradaTexto} (${sp})<br>
             <b>Bus:</b> ${vref}<br>
             <b>Matrícula:</b> ${infoBus.matricula}<br>
             <b>Modelo:</b> ${infoBus.modelo}<br>
             <b>Fecha matriculación:</b> ${infoBus.fecha}
           `);
           markers.push(marcador);
+          bounds.extend([lat, lon]);
           encontrados++;
         }
 
         if (!encontrados) {
-          alert("No se encontraron buses para esa línea.");
+          alert("No se encontraron buses en tiempo real para esa línea.");
         } else {
-          map.setView(markers[0].getLatLng(), 13);
+            map.fitBounds(bounds, { padding: [50, 50] });
         }
       } catch (e) {
-        console.error("Error en buscarBuses:", e);
-        alert("Error al descargar o procesar datos.");
+        console.error("Error en buscarBusesPorLinea:", e);
+        alert("Error al descargar o procesar datos de Bizkaibus.");
       }
     }
 
-    // 4️⃣ Inicialización al cargar la página
+    async function buscarBusesPorParada() {
+        const stopIdInput = document.getElementById("parada").value.trim();
+        if (!stopIdInput) {
+            return alert("Introduce un número de parada válido.");
+        }
+
+        const stopId = stopIdInput;
+        
+        if (!stopsData.has(stopId)) {
+            console.error(`La parada con ID "${stopId}" NO se encontró en stopsData.`);
+            return alert("Parada no encontrada. Introduce un ID de parada válido.");
+        }
+
+        // Limpia los marcadores de la búsqueda de línea anterior y otros elementos
+        clearLineSearchMarkers();
+        clearMapElements(); 
+
+        document.getElementById('route-details').style.display = 'none';
+
+        const busListDiv = document.getElementById("bus-list");
+        busListDiv.innerHTML = "Cargando próximos autobuses...";
+        document.getElementById('stop-results').style.display = 'block';
+
+        const now = new Date();
+        const currentDayOfWeek = now.getDay();
+        const currentYear = now.getFullYear();
+        const currentMonth = (now.getMonth() + 1).toString().padStart(2, '0');
+        const currentDay = now.getDate().toString().padStart(2, '0');
+        const currentDate = `${currentYear}${currentMonth}${currentDay}`;
+        const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+
+        const upcomingBuses = [];
+
+        const stopTimesAtThisStop = stopTimesData.filter(st => st.stop_id === stopId);
+
+        for (const st of stopTimesAtThisStop) {
+            const trip = tripsData.get(st.trip_id);
+            if (!trip) continue;
+
+            const service = calendarData.get(trip.service_id);
+            if (!service) continue;
+
+            const serviceStartDate = parseInt(service.start_date);
+            const serviceEndDate = parseInt(service.end_date);
+            const currentFormattedDate = parseInt(currentDate);
+
+            if (currentFormattedDate < serviceStartDate || currentFormattedDate > serviceEndDate) {
+                continue; 
+            }
+
+            const serviceExceptions = calendarDatesData.get(trip.service_id);
+            const currentException = serviceExceptions ? serviceExceptions.get(currentDate) : undefined;
+
+            let runsToday = false;
+
+            if (currentException === 1) {
+                runsToday = true;
+            } else if (currentException === 2) {
+                runsToday = false;
+            } else {
+                switch (currentDayOfWeek) {
+                    case 0: runsToday = service.sunday === 1; break;
+                    case 1: runsToday = service.monday === 1; break;
+                    case 2: runsToday = service.tuesday === 1; break;
+                    case 3: runsToday = service.wednesday === 1; break;
+                    case 4: runsToday = service.thursday === 1; break;
+                    case 5: runsToday = service.friday === 1; break;
+                    case 6: runsToday = service.saturday === 1; break;
+                }
+            }
+            
+            if (!runsToday) continue;
+
+            if (st.departure_time > currentTime) {
+                upcomingBuses.push({
+                    linea: trip.route_id,
+                    hora: st.departure_time,
+                    destino: trip.trip_headsign,
+                    trip_id: st.trip_id,
+                    shape_id: trip.shape_id
+                });
+            }
+        }
+
+        upcomingBuses.sort((a, b) => a.hora.localeCompare(b.hora));
+
+        busListDiv.innerHTML = "";
+        if (upcomingBuses.length > 0) {
+            const stopInfo = stopsData.get(stopId);
+            if (stopInfo) {
+                // Usar la función auxiliar para limpiar el nombre de la parada
+                const paradaTexto = getCleanStopName(stopId);
+
+                const stopMarker = L.marker([stopInfo.stop_lat, stopInfo.stop_lon]).addTo(map);
+                // Usar paradaTexto sin el ID duplicado
+                stopMarker.bindPopup(`<b>Parada:</b> ${paradaTexto} (${stopId})`).openPopup();
+                markers.push(stopMarker); 
+                map.setView([stopInfo.stop_lat, stopInfo.stop_lon], 15);
+            }
+
+            upcomingBuses.slice(0, 10).forEach(bus => {
+                const busOption = document.createElement("div");
+                busOption.classList.add("bus-option");
+                busOption.innerHTML = `
+                    <span>Línea: ${bus.linea}</span>
+                    <span>Hora: ${bus.hora}</span>
+                    <span>Destino: ${bus.destino}</span>
+                `;
+                busOption.onclick = () => {
+                    console.log("Trip ID seleccionado:", bus.trip_id);
+                    // Ahora mostrarRecorrido también se encargará de llamar a localizarBusEnTiempoReal
+                    mostrarRecorrido(bus.trip_id, bus.shape_id); 
+                };
+                busListDiv.appendChild(busOption);
+            });
+        } else {
+            busListDiv.innerHTML = "<p>No hay próximos autobuses programados para esta parada hoy.</p>";
+        }
+    }
+
+    // Función que localiza un bus en tiempo real y lo marca con el icono de bus rojo
+    // Ahora puede recibir targetTripId O targetVehicleRef
+    async function localizarBusEnTiempoReal(targetTripId = null, targetVehicleRef = null) {
+        // Lógica de validación
+        if (!targetTripId && !targetVehicleRef) {
+            console.error("localizarBusEnTiempoReal: Se requiere targetTripId o targetVehicleRef.");
+            alert("No se puede localizar el bus sin un identificador.");
+            return;
+        }
+
+        // Si ya hay un marcador de bus en tiempo real, lo eliminamos antes de añadir el nuevo.
+        if (realTimeBusMarker) {
+            map.removeLayer(realTimeBusMarker);
+            realTimeBusMarker = null;
+        }
+
+        try {
+            const resp = await fetch("https://bizkaibus.onrender.com/bizkaibus");
+            const xmlText = await resp.text();
+            const xml = new DOMParser().parseFromString(xmlText, "application/xml");
+            const actividades = xml.getElementsByTagName("VehicleActivity");
+
+            let busEncontrado = false;
+            let currentBusLat, currentBusLon;
+            let currentTripId = null; // Variable para almacenar el trip_id encontrado
+
+            for (let act of actividades) {
+                const jref = act.querySelector("VehicleJourneyRef")?.textContent.trim(); // Trip ID
+                const vref = act.querySelector("VehicleRef")?.textContent.trim(); // VehicleRef (número de bus)
+                const lat = parseFloat(act.querySelector("Latitude")?.textContent);
+                const lon = parseFloat(act.querySelector("Longitude")?.textContent);
+                const spRef = act.querySelector("StopPointRef")?.textContent.trim();
+
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    // Condición para encontrar el bus: por tripId o por VehicleRef
+                    const condicionCumplida = 
+                        (targetTripId && jref === targetTripId) ||
+                        (targetVehicleRef && vref === targetVehicleRef);
+
+                    if (condicionCumplida) {
+                        const infoBus = busInfoMap.get(vref) || { matricula: "—", modelo: "—", fecha: "—"};
+                        
+                        // Usar la función auxiliar para limpiar el nombre de la parada
+                        const paradaActualNombre = getCleanStopName(spRef);
+
+                        // Obtener Route ID y Headsign si no vienen del targetTripId
+                        let lineaDisplay = 'N/A';
+                        let destinoDisplay = 'N/A';
+                        if (jref && tripsData.has(jref)) {
+                            lineaDisplay = tripsData.get(jref).route_id || 'N/A';
+                            destinoDisplay = tripsData.get(jref).trip_headsign || 'N/A';
+                        }
+                        
+                        // Crea el marcador con el icono de bus rojo
+                        realTimeBusMarker = L.marker([lat, lon], { icon: busIcon }).addTo(map);
+                        // Usar paradaActualNombre sin el ID duplicado
+                        realTimeBusMarker.bindPopup(`
+                            <b>¡Autobús en tiempo real!</b><br>
+                            <b>Línea:</b> ${lineaDisplay}<br>
+                            <b>Destino:</b> ${destinoDisplay}<br>
+                            <b>Bus Nº:</b> ${vref}<br>
+                            <b>Matrícula:</b> ${infoBus.matricula}<br>
+                            <b>Modelo:</b> ${infoBus.modelo}<br>
+                            <b>En parada:</b> ${paradaActualNombre} (${spRef || 'N/A'})
+                        `).openPopup();
+                        
+                        busEncontrado = true;
+                        currentBusLat = lat;
+                        currentBusLon = lon;
+                        currentTripId = jref; // Almacenar el trip_id del bus encontrado
+                        console.log("Autobús en tiempo real localizado:", { tripId: jref, vref: vref, lat, lon });
+                        break;
+                    }
+                }
+            }
+
+            if (!busEncontrado) {
+                let msg = `No se encontró el autobús`;
+                if (targetTripId) msg += ` con el trip ID ${targetTripId}`;
+                if (targetVehicleRef) msg += ` con el número ${targetVehicleRef}`;
+                msg += ` en tiempo real. Puede que no esté circulando actualmente o no se estén recibiendo sus datos.`;
+                alert(msg);
+                console.warn(msg);
+                return null; // Retornar null si no se encontró
+            } else {
+                // Ajustar el mapa para incluir el bus en tiempo real junto con el recorrido y paradas.
+                let currentBounds = map.getBounds();
+                if (currentBounds.isValid() && (currentBounds.contains([currentBusLat, currentBusLon]))) {
+                    // Si el bus ya está en la vista actual (por un recorrido o parada), no cambiamos el zoom
+                } else {
+                    map.setView([currentBusLat, currentBusLon], 15); // Zoom a la ubicación del bus
+                }
+                return currentTripId; // Retornar el trip_id del bus encontrado
+            }
+
+        } catch (e) {
+            console.error("Error al localizar el bus en tiempo real:", e);
+            alert("Error al intentar obtener la ubicación en tiempo real del autobús.");
+            return null; // Retornar null en caso de error
+        }
+    }
+
+
+    async function buscarBusPorNumero() {
+        const numBus = document.getElementById("numBus").value.trim();
+        if (!numBus) {
+            alert("Introduce un número de bus válido.");
+            return;
+        }
+
+        // Limpia todos los elementos anteriores del mapa y los resultados de búsqueda
+        clearMapElements();
+        clearLineSearchMarkers();
+        document.getElementById('stop-results').style.display = 'none';
+        document.getElementById('route-details').style.display = 'none';
+
+        // Llama a localizarBusEnTiempoReal con el número de bus
+        // Esta función ahora devuelve el trip_id si lo encuentra
+        const foundTripId = await localizarBusEnTiempoReal(null, numBus);
+
+        if (foundTripId) {
+            // Si se encontró el bus y su trip_id, mostrar el recorrido
+            const tripInfo = tripsData.get(foundTripId);
+            if (tripInfo) {
+                mostrarRecorrido(foundTripId, tripInfo.shape_id);
+            } else {
+                console.warn(`Trip ID ${foundTripId} encontrado para el bus ${numBus}, pero no se encontraron sus detalles en tripsData.`);
+            }
+        }
+    }
+
+
+    async function mostrarRecorrido(tripId, shapeId) {
+        // Limpiar solo los elementos de la búsqueda de línea (buses en tiempo real)
+        clearLineSearchMarkers();
+        // Limpiar los marcadores de parada y polilíneas para dibujar el nuevo recorrido
+        stopMarkers.forEach(m => map.removeLayer(m));
+        stopMarkers = [];
+        linePolylines.forEach(poly => map.removeLayer(poly));
+        linePolylines = [];
+        // Limpiar el marcador del bus en tiempo real anterior, si lo hay
+        // NO lo borramos aquí, porque localizarBusEnTiempoReal ya lo hace y lo posiciona.
+        // Si venimos de buscarBusPorNumero, el bus ya está puesto.
+        // Si venimos de buscarBusesPorParada, el bus se pondrá al final.
+        // if (realTimeBusMarker) {
+        //     map.removeLayer(realTimeBusMarker);
+        //     realTimeBusMarker = null;
+        // }
+
+        document.getElementById('stop-results').style.display = 'none';
+        document.getElementById('route-details').style.display = 'block';
+
+        const trip = tripsData.get(tripId);
+        if (!trip) {
+            alert("Información del viaje no encontrada.");
+            return;
+        }
+
+        document.getElementById('route-line-name').textContent = trip.route_id;
+        document.getElementById('route-headsign').textContent = trip.trip_headsign;
+        const routeStopList = document.getElementById('route-stop-list');
+        routeStopList.innerHTML = "";
+
+        const stopsOnRoute = stopTimesData
+            .filter(st => st.trip_id === tripId)
+            .sort((a, b) => a.stop_sequence - b.stop_sequence);
+
+        let bounds = new L.LatLngBounds();
+        let polylinePoints = [];
+
+        for (const st of stopsOnRoute) {
+            const stopInfo = stopsData.get(st.stop_id);
+            if (stopInfo) {
+                // Usar la función auxiliar para limpiar el nombre de la parada
+                const paradaTexto = getCleanStopName(st.stop_id);
+
+                const li = document.createElement("li");
+                li.innerHTML = `<b>${st.arrival_time}</b> - ${paradaTexto} (${st.stop_id})`; 
+                routeStopList.appendChild(li);
+
+                const marker = L.marker([stopInfo.stop_lat, stopInfo.stop_lon]).addTo(map);
+                marker.bindPopup(`
+                    <b>Parada:</b> ${paradaTexto}<br>
+                    <b>ID:</b> ${st.stop_id}<br>
+                    <b>Hora de llegada:</b> ${st.arrival_time}<br>
+                    <b>Hora de salida:</b> ${st.departure_time}
+                `);
+                stopMarkers.push(marker); 
+                bounds.extend([stopInfo.stop_lat, stopInfo.stop_lon]);
+                polylinePoints.push([stopInfo.stop_lat, stopInfo.stop_lon]);
+            }
+        }
+
+        if (polylinePoints.length > 0) {
+            const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+            const polyline = L.polyline(polylinePoints, { color: color, weight: 5, opacity: 0.7 }).addTo(map);
+            linePolylines.push(polyline);
+            // Ajustar el mapa para mostrar el recorrido programado
+            map.fitBounds(bounds, { padding: [50, 50] });
+        } else {
+            alert("No se encontraron paradas para este recorrido programado.");
+        }
+
+        // Si la llamada a mostrarRecorrido no vino de buscarBusPorNumero,
+        // entonces llamamos a localizarBusEnTiempoReal para este tripId.
+        // Si ya viene de buscarBusPorNumero, el bus ya está localizado.
+        // Lo que hacemos es verificar si realTimeBusMarker ya existe y tiene el tripId correcto
+        // para evitar relocalizar y mover el mapa innecesariamente.
+        if (!realTimeBusMarker || tripsData.get(realTimeBusMarker.options.popup.getContent().match(/<b>Línea:<\/b>\s*([^<]+)/)?.[1]) !== trip.route_id) {
+            localizarBusEnTiempoReal(tripId, null); 
+        }
+    }
+
     window.onload = async () => {
-      await Promise.all([cargarParadas(), cargarBusInfo()]);
+      await Promise.all([cargarBusInfo(), cargarDatosGTFS()]); 
+      document.getElementById('stop-results').style.display = 'none';
+      document.getElementById('route-details').style.display = 'none';
     };
   </script>
 </body>
