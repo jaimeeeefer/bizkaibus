@@ -616,7 +616,7 @@
                 const busOption = document.createElement("div");
                 busOption.classList.add("bus-option");
 
-                let scheduledTimeDisplay = bus.hora; 
+                let scheduledTimeDisplay = bus.hora.substring(0, 5);
                 let delayStatusText = "";
 
                 if (realTimeActivities.has(bus.trip_id)) {
