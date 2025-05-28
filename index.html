@@ -589,6 +589,7 @@
             // *** NUEVO: Calcular la hora estimada de salida ***
             let estimatedDepartureSeconds = timeToSeconds(st.departure_time);
             let delayStatusText = "";
+            let isBusOnTime = false; // Bandera para saber si el bus está en hora
 
             if (realTimeActivities.has(st.trip_id)) {
                 const liveBusData = realTimeActivities.get(st.trip_id);
@@ -612,10 +613,9 @@
                             delayStatusText = `<span class="delay-text-stop-list delay">(+${delayMinutes}m)</span>`;
                         } else if (delayMinutes < -1) { 
                             delayStatusText = `<span class="delay-text-stop-list advance">(${delayMinutes}m)</span>`;
-                        } else if (delayMinutes !== 0) { 
-                            delayStatusText = `<span class="delay-text-stop-list on-time">(${delayMinutes > 0 ? '+' : ''}${delayMinutes}m)</span>`;
-                        } else if (delayMinutes == 0) {
-                            delayStatusText = `<span class="delay-text-stop-list advance">(En hora)</span>`;
+                        } else { // Si el retraso está entre -1 y 1 minuto (inclusive)
+                            isBusOnTime = true;
+                            delayStatusText = `<span class="delay-text-stop-list on-time">(En hora)</span>`;
                         }
                     }
                 }
@@ -630,6 +630,7 @@
                     estimatedDepartureSeconds: estimatedDepartureSeconds, // Hora estimada en segundos
                     estimatedDepartureTimeDisplay: secondsToTime(estimatedDepartureSeconds).substring(0, 5), // Hora estimada para mostrar
                     delayText: delayStatusText, // Texto del retraso/adelanto
+                    isBusOnTime: isBusOnTime, // Añadir la bandera
                     destino: trip.trip_headsign,
                     trip_id: st.trip_id,
                     shape_id: trip.shape_id 
@@ -654,13 +655,17 @@
                 const busOption = document.createElement("div");
                 busOption.classList.add("bus-option");
 
-                // *** NUEVO: Mostrar la hora estimada y el estado de retraso ***
+                let timeDisplay = `Prog.: ${bus.hora.substring(0, 5)}`;
+                if (!bus.isBusOnTime) { // Solo muestra la hora estimada si no está en hora
+                    timeDisplay += ` Est.: ${bus.estimatedDepartureTimeDisplay}`;
+                }
+                timeDisplay += ` ${bus.delayText}`;
+
                 busOption.innerHTML = `
                     <span class="bus-option-linea">Línea: ${bus.linea}</span>
-                    <span class="bus-option-hora">Prog.: ${bus.hora.substring(0, 5)} Est.: ${bus.estimatedDepartureTimeDisplay} ${bus.delayText}</span>
+                    <span class="bus-option-hora">${timeDisplay}</span>
                     <span class="bus-option-destino">Destino: ${bus.destino}</span>
                 `;
-                // ************************************************************
                 busOption.onclick = () => {
                     mostrarRecorrido(bus.trip_id, bus.shape_id); 
                 };
@@ -853,7 +858,13 @@
                     if (scheduledSeconds > 0) {
                         const estimatedSeconds = scheduledSeconds + currentBusDelayInSeconds;
                         const estimatedTimeStr = secondsToTime(estimatedSeconds);
-                        estimatedTimeHtml = ` <span class="estimated-time">(Est: ${estimatedTimeStr})</span>`;
+                        // Check if the delay is significant enough to show estimated time
+                        if (Math.abs(currentBusDelayInSeconds) > 60) { // Show estimated time if delay is more than 1 minute
+                             estimatedTimeHtml = ` <span class="estimated-time">(Est: ${estimatedTimeStr})</span>`;
+                        } else {
+                            // If delay is within 1 minute, consider it "en hora" and don't show estimated time
+                            estimatedTimeHtml = ` <span class="estimated-time">(En hora)</span>`;
+                        }
                     }
                 }
                 
