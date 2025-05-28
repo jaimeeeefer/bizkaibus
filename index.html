@@ -640,7 +640,7 @@
                             if (delayMinutes > 1) { 
                                 delayStatusText = `<span class="delay-text-stop-list delay">(+${delayMinutes}m)</span>`;
                             } else if (delayMinutes < -1) { 
-                                delayStatusText = `<span class="delay-text-stop-list advance">(${Math.abs(delayMinutes)}m)</span>`;
+                                delayStatusText = `<span class="delay-text-stop-list advance">(${delayMinutes}m)</span>`;
                             } else if (delayMinutes !== 0) { 
                                 delayStatusText = `<span class="delay-text-stop-list on-time">(${delayMinutes > 0 ? '+' : ''}${delayMinutes}m)</span>`;
                             }
