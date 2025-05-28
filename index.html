@@ -522,10 +522,12 @@
         const currentMonth = (now.getMonth() + 1).toString().padStart(2, '0');
         const currentDay = now.getDate().toString().padStart(2, '0');
         const currentDate = `${currentYear}${currentMonth}${currentDay}`;
-        const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+        
+        // Convertir currentTime a segundos para facilitar comparaciones
+        const currentSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
 
-        // === COMIENZO DEL BLOQUE MOVIDO (antes estaba más abajo) ===
-        const realTimeActivities = new Map(); // AHORA SE DECLARA AQUÍ
+        // Obtener actividades en tiempo real una vez al principio
+        const realTimeActivities = new Map();
         try {
             const rtResp = await fetch("https://bizkaibus.onrender.com/bizkaibus");
             const rtXmlText = await rtResp.text();
@@ -544,9 +546,7 @@
             }
         } catch (e) {
             console.warn("No se pudieron obtener datos en tiempo real para estimaciones en lista de paradas:", e);
-            // Si hay un error, la lista upcomingBuses se basará solo en horarios programados y currentTime.
         }
-        // === FIN DEL BLOQUE MOVIDO ===
 
         const upcomingBuses = [];
         const stopTimesAtThisStop = stopTimesData.filter(st => st.stop_id === stopId);
@@ -592,36 +592,59 @@
             
             if (!runsToday) continue;
 
-            // LÓGICA DE FILTRADO EN TIEMPO REAL (ahora realTimeActivities está definida)
+            // Lógica de filtrado en tiempo real
             let hasBusPassed = false;
+            let estimatedDepartureSeconds = timeToSeconds(st.departure_time); //
+            
             const liveBusData = realTimeActivities.get(st.trip_id);
             if (liveBusData && liveBusData.stopPointRef) {
                 const realTimeBusStopSequence = stopTimesData.find(
                     rt_st => rt_st.trip_id === st.trip_id && rt_st.stop_id === liveBusData.stopPointRef
                 )?.stop_sequence;
 
-                if (realTimeBusStopSequence !== undefined && currentStopSequence !== undefined &&
-                    realTimeBusStopSequence >= currentStopSequence) {
-                    hasBusPassed = true;
+                if (realTimeBusStopSequence !== undefined && currentStopSequence !== undefined) {
+                    if (realTimeBusStopSequence >= currentStopSequence) {
+                        hasBusPassed = true; // El bus ya ha pasado o está en la parada
+                    } else { // El bus aún no ha llegado a la parada de búsqueda
+                        // Calcular el retraso/adelanto en la parada actual del bus
+                        const liveBusStopSchedule = stopTimesData.find(
+                            rt_st => rt_st.trip_id === st.trip_id && rt_st.stop_id === liveBusData.stopPointRef
+                        );
+
+                        if (liveBusStopSchedule && liveBusData.recordedAtTimeISO) {
+                            const scheduledTimeAtLiveBusStopSeconds = timeToSeconds(liveBusStopSchedule.arrival_time);
+                            const realTimeDate = new Date(liveBusData.recordedAtTimeISO);
+                            const actualTimeAtLiveBusStopSeconds = realTimeDate.getHours() * 3600 + realTimeDate.getMinutes() * 60 + realTimeDate.getSeconds();
+                            
+                            const delayAtLiveBusStopSeconds = actualTimeAtLiveBusStopSeconds - scheduledTimeAtLiveBusStopSeconds;
+                            
+                            // Aplicar este retraso/adelanto a la hora de salida programada de *nuestra* parada
+                            estimatedDepartureSeconds = estimatedDepartureSeconds + delayAtLiveBusStopSeconds;
+                        }
+                    }
                 }
             }
 
-            // Solo añadir si la hora de salida programada es futura Y el bus NO ha pasado ya la parada
-            if (st.departure_time > currentTime && !hasBusPassed) {
+            // CAMBIO CLAVE: Comprobar la hora estimada de salida, no solo la programada
+            // Solo añadir si la hora de salida estimada es futura Y el bus NO ha pasado ya la parada
+            if (estimatedDepartureSeconds > currentSeconds && !hasBusPassed) {
                 upcomingBuses.push({
                     linea: trip.route_id,
-                    hora: st.departure_time, 
+                    hora: st.departure_time, // Seguimos usando la hora programada para mostrar
                     destino: trip.trip_headsign,
                     trip_id: st.trip_id,
-                    shape_id: trip.shape_id 
+                    shape_id: trip.shape_id,
+                    // Añadir la hora estimada real para futuras referencias si es necesario
+                    estimated_hora_seconds: estimatedDepartureSeconds 
                 });
             }
         }
 
-        upcomingBuses.sort((a, b) => a.hora.localeCompare(b.hora));
+        upcomingBuses.sort((a, b) => {
+            // Ordenar por la hora estimada, no por la programada
+            return a.estimated_hora_seconds - b.estimated_hora_seconds;
+        });
         busListDiv.innerHTML = ""; 
-
-        // El bloque para obtener realTimeActivities que estaba aquí ABAJO, ahora está ARRIBA.
 
         if (upcomingBuses.length > 0) {
             const stopInfo = stopsData.get(stopId);
@@ -650,7 +673,7 @@
                     if (liveBusStopSchedule && liveBusData.recordedAtTimeISO) {
                         const scheduledTimeAtLiveBusStopStr = liveBusStopSchedule.arrival_time; 
                         const scheduledTimeAtLiveBusStopSeconds = timeToSeconds(scheduledTimeAtLiveBusStopStr);
-
+                        
                         const realTimeDate = new Date(liveBusData.recordedAtTimeISO);
                         const actualTimeAtLiveBusStopStr = `${realTimeDate.getHours().toString().padStart(2, '0')}:${realTimeDate.getMinutes().toString().padStart(2, '0')}:${realTimeDate.getSeconds().toString().padStart(2, '0')}`;
                         const actualTimeAtLiveBusStopSeconds = timeToSeconds(actualTimeAtLiveBusStopStr);
