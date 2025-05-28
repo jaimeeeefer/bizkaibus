@@ -860,7 +860,9 @@
                 const li = document.createElement("li");
 
                 let estimatedTimeHtml = "";
-                if (currentBusDelayInSeconds !== null) { 
+                // Si el bus NO tiene un retraso significativo (o es null/0), no mostramos la hora estimada.
+                // Usamos el mismo umbral de 15 segundos que para el mensaje "En hora" en delay-info
+                if (currentBusDelayInSeconds !== null && Math.abs(currentBusDelayInSeconds) > 15) { 
                     const scheduledSeconds = timeToSeconds(st.arrival_time);
                     if (scheduledSeconds > 0) {
                         const estimatedSeconds = scheduledSeconds + currentBusDelayInSeconds;
