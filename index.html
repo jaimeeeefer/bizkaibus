@@ -567,7 +567,24 @@
             
             if (!runsToday) continue;
 
-            if (st.departure_time > currentTime) {
+            let hasBusPassed = false;
+            const liveBusData = realTimeActivities.get(st.trip_id); // Check if this trip_id is in real-time data
+            if (liveBusData && liveBusData.stopPointRef) {
+                // Find the stop_sequence of the stop where the real-time bus is currently reported
+                const realTimeBusStopSequence = stopTimesData.find(
+                    rt_st => rt_st.trip_id === st.trip_id && rt_st.stop_id === liveBusData.stopPointRef
+                )?.stop_sequence;
+
+                // If the real-time bus is at or past the user's searched stop
+                if (realTimeBusStopSequence !== undefined && currentStopSequence !== undefined &&
+                    realTimeBusStopSequence >= currentStopSequence) {
+                    hasBusPassed = true;
+                }
+            }
+
+            // Only add to upcomingBuses if scheduled time is in the future AND
+            // the bus has NOT already passed the stop according to real-time data
+            if (st.departure_time > currentTime && !hasBusPassed) {
                 upcomingBuses.push({
                     linea: trip.route_id,
                     hora: st.departure_time, 
