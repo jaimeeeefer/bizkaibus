@@ -87,10 +87,10 @@
         font-style: italic;
         margin-left: 5px;
     }
-    .waypoint-icon { /* NUEVO: Estilo para el icono de waypoint */
+    .waypoint-icon { 
         margin-left: 5px;
-        color: blue; /* O el color que prefieras */
-        cursor: default; /* Para que no parezca clickeable si no lo es */
+        color: blue; 
+        cursor: default; 
     }
   </style>
 </head>
@@ -173,8 +173,7 @@
     let calendarDatesData = new Map();
 
     let currentBusDelayInSeconds = null; 
-    // NUEVO: Variable para almacenar el ID de la parada actual/siguiente del bus en tiempo real
-    let currentBusStopIdRealTime = null;
+    let currentBusStopIdRealTime = null; // Mantenemos esta global por ahora para cambios mínimos
 
     const COLORS = ['#FF0000', '#0000FF', '#008000', '#FFA500', '#800080', '#00FFFF', '#FF00FF', '#808080'];
 
@@ -220,6 +219,7 @@
 
     async function cargarDatosGTFS() {
       try {
+        // ... (sin cambios en cargarDatosGTFS) ...
         console.log("Iniciando carga de stops.txt desde:", STOPS_URL);
         const resStops = await fetch(STOPS_URL);
         const textStops = await resStops.text();
@@ -234,10 +234,10 @@
                 stop_lon: parseFloat(row[5]),
               });
           } else {
-              console.warn("Skipping malformed or incomplete row in stops.txt:", row);
+              // console.warn("Skipping malformed or incomplete row in stops.txt:", row);
           }
         });
-        console.log("stopsData map size after loading:", stopsData.size);
+        // console.log("stopsData map size after loading:", stopsData.size);
 
         const stopTimesPromises = [
             fetch(STOP_TIMES1_URL).then(res => res.text()),
@@ -260,7 +260,7 @@
                 }
             });
         });
-        console.log("Total stopTimes loaded:", stopTimesData.length);
+        // console.log("Total stopTimes loaded:", stopTimesData.length);
 
         const resTrips = await fetch(TRIPS_URL);
         const textTrips = await resTrips.text();
@@ -275,7 +275,7 @@
               });
           }
         });
-        console.log("Total trips loaded:", tripsData.size);
+        // console.log("Total trips loaded:", tripsData.size);
 
         const resCalendar = await fetch(CALENDAR_URL);
         const textCalendar = await resCalendar.text();
@@ -295,7 +295,7 @@
                 });
             }
         });
-        console.log("Total calendar services loaded:", calendarData.size);
+        // console.log("Total calendar services loaded:", calendarData.size);
 
         const resCalendarDates = await fetch(CALENDAR_DATES_URL);
         const textCalendarDates = await resCalendarDates.text();
@@ -312,14 +312,15 @@
                 calendarDatesData.get(service_id).set(date, exception_type);
             }
         });
-        console.log("Total calendar_dates loaded (unique service_id with exceptions):", calendarDatesData.size);
-
+        // console.log("Total calendar_dates loaded (unique service_id with exceptions):", calendarDatesData.size);
+        console.log("Carga de datos GTFS completada.");
       } catch (e) {
         console.error("Error cargando datos GTFS:", e);
       }
     }
 
     async function cargarBusInfo() {
+      // ... (sin cambios en cargarBusInfo) ...
       try {
         const res = await fetch(SHEET_TSV_URL);
         const tsv = await res.text();
@@ -358,7 +359,7 @@
 
     function clearMapElements() {
         currentBusDelayInSeconds = null; 
-        currentBusStopIdRealTime = null; // NUEVO: Resetear ID de parada actual
+        currentBusStopIdRealTime = null; 
         document.getElementById('delay-info').textContent = ''; 
 
         if (realTimeBusMarker) {
@@ -377,6 +378,7 @@
     }
 
     async function buscarBusesPorLinea() {
+      // ... (sin cambios en buscarBusesPorLinea) ...
       const inputRaw = document.getElementById("linea").value.trim();
       if (!inputRaw) return alert("Introduce un número de línea válido");
 
@@ -389,7 +391,7 @@
       document.getElementById('stop-results').style.display = 'none';
       document.getElementById('route-details').style.display = 'none';
       currentBusDelayInSeconds = null; 
-      currentBusStopIdRealTime = null; // NUEVO
+      currentBusStopIdRealTime = null; 
       document.getElementById('delay-info').textContent = '';
 
 
@@ -448,6 +450,7 @@
     }
 
     async function buscarBusesPorParada() {
+        // ... (sin cambios en buscarBusesPorParada) ...
         const stopIdInput = document.getElementById("parada").value.trim();
         if (!stopIdInput) {
             return alert("Introduce un número de parada válido.");
@@ -465,7 +468,7 @@
 
         document.getElementById('route-details').style.display = 'none';
         currentBusDelayInSeconds = null; 
-        currentBusStopIdRealTime = null; // NUEVO
+        currentBusStopIdRealTime = null; 
         document.getElementById('delay-info').textContent = ''; 
 
         const busListDiv = document.getElementById("bus-list");
@@ -567,9 +570,13 @@
     }
 
     async function localizarBusEnTiempoReal(targetTripId = null, targetVehicleRef = null) {
-        currentBusDelayInSeconds = null; 
-        currentBusStopIdRealTime = null; // NUEVO: Resetear al inicio de cada localización
-        document.getElementById('delay-info').textContent = ''; 
+        // No resetear currentBusStopIdRealTime aquí directamente si queremos que se use en el popup
+        // Se reseteará globalmente o se sobrescribirá.
+        // currentBusDelayInSeconds y currentBusStopIdRealTime se establecen si se encuentra el bus.
+        // Si no se encuentra, se dejan/ponen a null al final.
+
+        let localBusDelayInSeconds = null;
+        let localBusStopIdRealTime = null;
 
         if (!targetTripId && !targetVehicleRef) {
             console.error("localizarBusEnTiempoReal: Se requiere targetTripId o targetVehicleRef.");
@@ -607,7 +614,7 @@
                     if (condicionCumplida) {
                         const infoBus = busInfoMap.get(vref) || { matricula: "—", modelo: "—", fecha: "—"};
                         const paradaActualNombre = getCleanStopName(spRef);
-                        currentBusStopIdRealTime = spRef; // NUEVO: Guardar el ID de la parada actual del bus
+                        localBusStopIdRealTime = spRef; // Guardar localmente para esta ejecución
 
                         let lineaDisplay = 'N/A';
                         let destinoDisplay = 'N/A';
@@ -643,28 +650,24 @@
                                 const realTimeSeconds = timeToSeconds(realTimeStr);
 
                                 if (scheduledArrivalSeconds > 0 && realTimeSeconds > 0) {
-                                    currentBusDelayInSeconds = realTimeSeconds - scheduledArrivalSeconds;
-                                    console.log(`Retraso calculado para bus ${vref} (trip ${jref}) en parada ${spRef}: ${currentBusDelayInSeconds}s. Real: ${realTimeStr}, Prog: ${scheduledArrivalTimeStr}`);
+                                    localBusDelayInSeconds = realTimeSeconds - scheduledArrivalSeconds; // Guardar localmente
+                                    // console.log(`Retraso calculado para bus ${vref} (trip ${jref}) en parada ${spRef}: ${localBusDelayInSeconds}s.`);
                                     
                                     const delayInfoEl = document.getElementById('delay-info');
-                                    if (currentBusDelayInSeconds > 60) {
-                                        delayInfoEl.textContent = `Retraso estimado: ${Math.round(currentBusDelayInSeconds / 60)} minutos.`;
+                                    if (localBusDelayInSeconds > 60) {
+                                        delayInfoEl.textContent = `Retraso estimado: ${Math.round(localBusDelayInSeconds / 60)} minutos.`;
                                         delayInfoEl.style.color = 'red';
-                                    } else if (currentBusDelayInSeconds < -60) {
-                                        delayInfoEl.textContent = `Adelanto estimado: ${Math.round(Math.abs(currentBusDelayInSeconds) / 60)} minutos.`;
+                                    } else if (localBusDelayInSeconds < -60) {
+                                        delayInfoEl.textContent = `Adelanto estimado: ${Math.round(Math.abs(localBusDelayInSeconds) / 60)} minutos.`;
                                         delayInfoEl.style.color = 'green';
-                                    } else if (currentBusDelayInSeconds !== 0 && Math.abs(currentBusDelayInSeconds) > 15) { // Pequeño umbral para "en hora"
-                                        delayInfoEl.textContent = `En hora (aprox. ${currentBusDelayInSeconds}s ${currentBusDelayInSeconds > 0 ? 'tarde' : 'pronto'}).`;
+                                    } else if (localBusDelayInSeconds !== 0 && Math.abs(localBusDelayInSeconds) > 15) { 
+                                        delayInfoEl.textContent = `En hora (aprox. ${localBusDelayInSeconds}s ${localBusDelayInSeconds > 0 ? 'tarde' : 'pronto'}).`;
                                         delayInfoEl.style.color = 'orange';
                                     } else {
                                         delayInfoEl.textContent = "En hora (según última actualización).";
                                         delayInfoEl.style.color = 'green';
                                     }
-                                } else {
-                                   console.warn("No se pudo calcular el retraso: tiempos inválidos.", {scheduledArrivalTimeStr, realTimeStr});
                                 }
-                            } else {
-                                console.warn(`No se encontró el stop_time para trip ${jref} y stop ${spRef} para calcular retraso.`);
                             }
                         }
                         break; 
@@ -672,14 +675,10 @@
                 }
             }
 
+            currentBusDelayInSeconds = localBusDelayInSeconds; // Actualizar globales al final si se encontró
+            currentBusStopIdRealTime = localBusStopIdRealTime;
+
             if (!busEncontrado) {
-                let msg = `No se encontró el autobús`;
-                if (targetTripId) msg += ` con el trip ID ${targetTripId}`;
-                if (targetVehicleRef) msg += ` con el número ${targetVehicleRef}`;
-                msg += ` en tiempo real.`;
-                console.warn(msg);
-                currentBusDelayInSeconds = null; 
-                currentBusStopIdRealTime = null; // NUEVO
                 document.getElementById('delay-info').textContent = 'Autobús no localizado en tiempo real.';
                 document.getElementById('delay-info').style.color = 'black';
                 return null;
@@ -690,8 +689,12 @@
                         map.setView([currentBusLat, currentBusLon], 15);
                     } else { 
                         let routeBounds = linePolylines[0].getBounds(); 
-                        routeBounds.extend([currentBusLat, currentBusLon]);
-                        map.fitBounds(routeBounds, { padding: [70, 70]});
+                        if (routeBounds.isValid()) { // Asegurarse que los bounds son válidos
+                            routeBounds.extend([currentBusLat, currentBusLon]);
+                            map.fitBounds(routeBounds, { padding: [70, 70]});
+                        } else { // Si los bounds del recorrido no son válidos, centrar en el bus
+                            map.setView([currentBusLat, currentBusLon], 15);
+                        }
                     }
                 }
                 return foundTripIdForBus; 
@@ -699,9 +702,9 @@
 
         } catch (e) {
             console.error("Error al localizar el bus en tiempo real:", e);
-            alert("Error al intentar obtener la ubicación en tiempo real del autobús.");
+            // alert("Error al intentar obtener la ubicación en tiempo real del autobús.");
             currentBusDelayInSeconds = null; 
-            currentBusStopIdRealTime = null; // NUEVO
+            currentBusStopIdRealTime = null; 
             document.getElementById('delay-info').textContent = 'Error obteniendo datos en tiempo real.';
             document.getElementById('delay-info').style.color = 'black';
             return null;
@@ -715,22 +718,21 @@
             return;
         }
 
-        clearMapElements();
+        clearMapElements(); // Esto resetea las globales currentBusDelayInSeconds y currentBusStopIdRealTime
         clearLineSearchMarkers();
         document.getElementById('stop-results').style.display = 'none';
         document.getElementById('route-details').style.display = 'none'; 
-        currentBusDelayInSeconds = null; 
-        currentBusStopIdRealTime = null; // NUEVO
         document.getElementById('delay-info').textContent = '';
 
         const foundTripId = await localizarBusEnTiempoReal(null, numBus);
+        // localizarBusEnTiempoReal habrá actualizado currentBusDelayInSeconds y currentBusStopIdRealTime
 
         if (foundTripId) {
             const tripInfo = tripsData.get(foundTripId);
             if (tripInfo) {
                 mostrarRecorrido(foundTripId, tripInfo.shape_id);
             } else {
-                console.warn(`Trip ID ${foundTripId} encontrado para el bus ${numBus}, pero no se encontraron sus detalles en tripsData.`);
+                // console.warn(`Trip ID ${foundTripId} encontrado para el bus ${numBus}, pero no se encontraron sus detalles en tripsData.`);
                 alert(`Se encontró el bus ${numBus} pero no se pudo cargar su recorrido completo (faltan datos del viaje).`);
                 document.getElementById('route-details').style.display = 'none';
             }
@@ -739,11 +741,10 @@
         }
     }
 
-    // Función auxiliar para renderizar la lista de paradas del recorrido
     function renderRouteStopList(tripId, stopsOnRoute) {
         const routeStopList = document.getElementById('route-stop-list');
-        routeStopList.innerHTML = ""; // Limpiar lista existente
-        let newBoundsForFit = new L.LatLngBounds();
+        routeStopList.innerHTML = ""; 
+        let listBounds = new L.LatLngBounds(); // Bounds solo para elementos de la lista (no usado para mapa aquí)
 
         stopsOnRoute.forEach(st => {
             const stopInfo = stopsData.get(st.stop_id);
@@ -752,7 +753,8 @@
                 const li = document.createElement("li");
 
                 let estimatedTimeHtml = "";
-                if (currentBusDelayInSeconds !== null) {
+                // Usar la variable global actualizada por localizarBusEnTiempoReal
+                if (currentBusDelayInSeconds !== null) { 
                     const scheduledSeconds = timeToSeconds(st.arrival_time);
                     if (scheduledSeconds > 0) {
                         const estimatedSeconds = scheduledSeconds + currentBusDelayInSeconds;
@@ -761,27 +763,29 @@
                     }
                 }
                 
-                // NUEVO: Añadir icono de waypoint si es la parada actual
                 let waypointIconHtml = "";
+                // Usar la variable global actualizada por localizarBusEnTiempoReal
                 if (currentBusStopIdRealTime && st.stop_id === currentBusStopIdRealTime) {
                     waypointIconHtml = ` <span class="waypoint-icon" title="Ubicación actual/próxima reportada">📍</span>`;
                 }
                 
                 li.innerHTML = `<span class="scheduled-time">${st.arrival_time}</span>${estimatedTimeHtml} - ${paradaTexto} (${st.stop_id})${waypointIconHtml}`;  
                 routeStopList.appendChild(li);
-                newBoundsForFit.extend([stopInfo.stop_lat, stopInfo.stop_lon]);
+                listBounds.extend([stopInfo.stop_lat, stopInfo.stop_lon]); // No es crucial para el mapa aquí
             }
         });
-        return newBoundsForFit;
+        return listBounds; // Devuelve bounds de las paradas en la lista
     }
-
 
     async function mostrarRecorrido(tripId, shapeId) {
         clearLineSearchMarkers();
+        // Limpiar solo marcadores de parada y polilíneas de recorridos anteriores
         stopMarkers.forEach(m => map.removeLayer(m));
         stopMarkers = [];
         linePolylines.forEach(poly => map.removeLayer(poly));
         linePolylines = [];
+        // El realTimeBusMarker y las variables currentBus... son gestionadas por localizarBusEnTiempoReal
+        // y por la llamada a localizarBusEnTiempoReal dentro de esta función si es necesario.
 
         document.getElementById('stop-results').style.display = 'none';
         document.getElementById('route-details').style.display = 'block';
@@ -800,62 +804,64 @@
             .filter(st => st.trip_id === tripId)
             .sort((a, b) => a.stop_sequence - b.stop_sequence);
 
-        // Renderizar la lista de paradas inicialmente (puede que sin info de retraso/waypoint aún)
-        let routeBounds = renderRouteStopList(tripId, stopsOnRoute); 
+        // Renderizar la lista HTML (renderRouteStopList usa las globales currentBus... que pueden estar ya seteadas)
+        renderRouteStopList(tripId, stopsOnRoute); 
         
+        let mapElementsBounds = new L.LatLngBounds(); // Bounds para los elementos del mapa (paradas, polilínea)
         let polylinePoints = [];
+
         stopsOnRoute.forEach(st => {
             const stopInfo = stopsData.get(st.stop_id);
             if (stopInfo) {
                  const marker = L.marker([stopInfo.stop_lat, stopInfo.stop_lon]).addTo(map);
-                marker.bindPopup(`
-                    <b>Parada:</b> ${paradaTextoOlimpio(st.stop_id)}<br> 
-                    <b>ID:</b> ${st.stop_id}<br>
-                    <b>Hora llegada prog.:</b> ${st.arrival_time}<br>
-                    <b>Hora salida prog.:</b> ${st.departure_time}
-                `); // paradaTextoOlimpio es un placeholder, usar getCleanStopName
+                 // CORREGIDO:
                  marker.bindPopup(`
                     <b>Parada:</b> ${getCleanStopName(st.stop_id)}<br>
                     <b>ID:</b> ${st.stop_id}<br>
                     <b>Hora llegada prog.:</b> ${st.arrival_time}<br>
                     <b>Hora salida prog.:</b> ${st.departure_time}
                 `);
-                stopMarkers.push(marker);  
+                stopMarkers.push(marker);
                 polylinePoints.push([stopInfo.stop_lat, stopInfo.stop_lon]);
+                mapElementsBounds.extend([stopInfo.stop_lat, stopInfo.stop_lon]);
             }
         });
-
 
         if (polylinePoints.length > 0) {
             const color = COLORS[Math.floor(Math.random() * COLORS.length)];
             const polyline = L.polyline(polylinePoints, { color: color, weight: 5, opacity: 0.7 }).addTo(map);
             linePolylines.push(polyline);
-            if (routeBounds.isValid()) {
-                 map.fitBounds(routeBounds, { padding: [50, 50] });
+            if (mapElementsBounds.isValid()) { // Ajustar a la polilínea y paradas
+                 map.fitBounds(mapElementsBounds, { padding: [50, 50] });
             }
         } else {
-            alert("No se encontraron paradas para este recorrido programado.");
+            // No mostrar alerta si la lista ya está vacía y el usuario lo ve
         }
 
-        // Si no tenemos info de retraso o parada actual, intentar localizar el bus
+        // Si no tenemos info de retraso O parada actual (porque se clickó desde lista de parada, no por numBus),
+        // intentar localizar el bus. localizarBusEnTiempoReal actualizará las globales.
         if (currentBusDelayInSeconds === null || currentBusStopIdRealTime === null) {
-            console.log("No hay info completa de retraso/parada, localizando bus para trip:", tripId);
+            // console.log("Info RT incompleta, localizando bus para trip:", tripId);
             await localizarBusEnTiempoReal(tripId, null);
             
-            // Si se encontró el bus y se actualizó la info, re-renderizar la lista y ajustar el mapa
+            // Si se encontró el bus y se actualizó la info, re-renderizar la lista HTML
+            // y ajustar el mapa para incluir el bus.
             if (currentBusDelayInSeconds !== null || currentBusStopIdRealTime !== null) {
-                routeBounds = renderRouteStopList(tripId, stopsOnRoute); // Re-renderizar con nueva info
-                if (realTimeBusMarker && routeBounds.isValid()) {
-                    routeBounds.extend(realTimeBusMarker.getLatLng());
-                    map.fitBounds(routeBounds, { padding: [70,70] });
-                } else if (routeBounds.isValid()){
-                    map.fitBounds(routeBounds, { padding: [50,50] });
+                renderRouteStopList(tripId, stopsOnRoute); // Re-renderizar lista HTML con nueva info
+                if (realTimeBusMarker && mapElementsBounds.isValid()) {
+                    mapElementsBounds.extend(realTimeBusMarker.getLatLng());
+                    map.fitBounds(mapElementsBounds, { padding: [70,70] });
+                } else if (realTimeBusMarker) { // Si solo hay bus y no recorrido
+                    map.setView(realTimeBusMarker.getLatLng(), 15);
                 }
             }
-        } else if (realTimeBusMarker && routeBounds.isValid()) {
-            // Si ya hay bus e info, solo ajustar el zoom para incluirlo si es necesario
-            routeBounds.extend(realTimeBusMarker.getLatLng());
-            map.fitBounds(routeBounds, { padding: [70,70] });
+        } else if (realTimeBusMarker && mapElementsBounds.isValid()) {
+            // Si ya hay bus e info, y recorrido, ajustar el zoom para incluir todo
+            mapElementsBounds.extend(realTimeBusMarker.getLatLng());
+            map.fitBounds(mapElementsBounds, { padding: [70,70] });
+        } else if (realTimeBusMarker) {
+             // Si solo hay bus y no recorrido (mapElementsBounds no sería válido)
+            map.setView(realTimeBusMarker.getLatLng(), 15);
         }
     }
 
