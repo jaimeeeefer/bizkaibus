@@ -73,6 +73,19 @@
     }
     #route-details li {
       margin-bottom: 0.2em;
+      padding: 0.3em;
+      border-bottom: 1px dashed #eee;
+    }
+    #route-details li:last-child {
+        border-bottom: none;
+    }
+    .scheduled-time {
+        font-weight: bold;
+    }
+    .estimated-time {
+        color: #d9534f; /* Un color rojo suave para la estimación */
+        font-style: italic;
+        margin-left: 5px;
     }
   </style>
 </head>
@@ -93,7 +106,7 @@
   <div id="route-details" style="display: none;">
     <h2>Detalles del recorrido: <span id="route-line-name"></span></h2>
     <p>Dirección: <span id="route-headsign"></span></p>
-    <ul id="route-stop-list"></ul>
+    <p id="delay-info" style="font-weight:bold;"></p> <ul id="route-stop-list"></ul>
   </div>
   <div id="map"></div>
   
@@ -145,8 +158,8 @@
     }).addTo(map);
 
     let markers = [];
-    let stopMarkers = []; // Separar marcadores de parada para borrar selectivamente
-    let realTimeBusMarker = null; // Para el marcador del bus en tiempo real
+    let stopMarkers = []; 
+    let realTimeBusMarker = null; 
     let linePolylines = [];
 
     let stopsData = new Map();
@@ -156,18 +169,55 @@
     let calendarData = new Map();
     let calendarDatesData = new Map();
 
+    // NUEVO: Variable para almacenar el retraso actual del bus en segundos
+    let currentBusDelayInSeconds = null; 
+
     const COLORS = ['#FF0000', '#0000FF', '#008000', '#FFA500', '#800080', '#00FFFF', '#FF00FF', '#808080'];
 
-    // Icono personalizado para el autobús en tiempo real
     const busIcon = L.icon({
-        iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png', // Marcador rojo base
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', // Sombra
+        iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
         iconSize: [25, 41],
         iconAnchor: [12, 41],
         popupAnchor: [1, -34],
         shadowSize: [41, 41]
     });
     
+    // NUEVO: Funciones auxiliares para manejar tiempos
+    function timeToSeconds(timeStr) {
+        if (!timeStr || !/^\d{2}:\d{2}:\d{2}$/.test(timeStr)) return 0;
+        const parts = timeStr.split(':');
+        return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
+    }
+
+    function secondsToTime(totalSeconds) {
+        if (totalSeconds === null || isNaN(totalSeconds)) return "N/A";
+        
+        // Manejar días siguientes si el retraso es muy grande (poco probable pero seguro)
+        const secondsInDay = 24 * 60 * 60;
+        let days = Math.floor(totalSeconds / secondsInDay);
+        let remainingSeconds = totalSeconds % secondsInDay;
+
+        // Si los segundos son negativos (adelanto que cruza la medianoche hacia atrás)
+        if (remainingSeconds < 0) {
+            remainingSeconds += secondsInDay;
+            days -=1; // Se fue al día anterior
+        }
+        
+        const h = Math.floor(remainingSeconds / 3600);
+        const m = Math.floor((remainingSeconds % 3600) / 60);
+        const s = remainingSeconds % 60;
+        
+        let timeString = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        if (days > 0) {
+            timeString += ` (+${days}d)`;
+        } else if (days < 0) {
+            timeString += ` (${days}d)`; // ej. (-1d) si se adelanta mucho
+        }
+        return timeString;
+    }
+
+
     async function cargarDatosGTFS() {
       try {
         console.log("Iniciando carga de stops.txt desde:", STOPS_URL);
@@ -177,7 +227,7 @@
         
         rowsStops.slice(1).forEach(row => {
           const stop_id = row[0]?.trim();
-          if (stop_id && row.length >= 6) { 
+          if (stop_id && row.length >= 6) {  
               stopsData.set(stop_id, {
                 stop_name: row[2]?.trim(),
                 stop_lat: parseFloat(row[4]),
@@ -291,11 +341,9 @@
       }
     }
 
-    // Función auxiliar para obtener el nombre de la parada sin el ID duplicado
     function getCleanStopName(stopId) {
         const stopInfo = stopsData.get(stopId);
         if (stopInfo) {
-            // Eliminar el último grupo de paréntesis con números si existe y coincide con el stopId
             const name = stopInfo.stop_name;
             const regex = new RegExp(`\\s*\\(${stopId}\\)$`);
             return name.replace(regex, '');
@@ -303,34 +351,29 @@
         return "Desconocida";
     }
 
-
     function extraerNumero(texto) {
       const m = texto.match(/\d+/);
       return m ? m[0] : null;
     }
 
     function clearMapElements() {
-        // Limpiar solo los marcadores de bus en tiempo real
+        currentBusDelayInSeconds = null; // NUEVO: Resetear retraso
+        document.getElementById('delay-info').textContent = ''; // NUEVO: Limpiar info de retraso
+
         if (realTimeBusMarker) {
             map.removeLayer(realTimeBusMarker);
             realTimeBusMarker = null;
         }
-        // Limpiar todas las líneas
         linePolylines.forEach(poly => map.removeLayer(poly));
         linePolylines = [];
-        // Limpiar marcadores de paradas
         stopMarkers.forEach(m => map.removeLayer(m));
         stopMarkers = [];
-        // No borramos 'markers' aquí porque 'buscarBusesPorLinea' lo gestiona
-        // y este 'clearMapElements' se llama desde 'mostrarRecorrido' y 'buscarBusesPorParada'.
     }
     
-    // Función para limpiar solo los marcadores de la búsqueda de línea (buses en tiempo real de línea)
     function clearLineSearchMarkers() {
         markers.forEach(m => map.removeLayer(m));
-        markers = []; // Reiniciar el array de marcadores de línea
+        markers = []; 
     }
-
 
     async function buscarBusesPorLinea() {
       const inputRaw = document.getElementById("linea").value.trim();
@@ -339,12 +382,14 @@
       const input = inputRaw.toUpperCase();
       const inputNum = extraerNumero(inputRaw);
 
-      // Limpia todo para la nueva búsqueda de línea
-      clearMapElements(); // Limpia paradas, recorridos y bus en tiempo real
-      clearLineSearchMarkers(); // Limpia los marcadores de línea anteriores
+      clearMapElements(); 
+      clearLineSearchMarkers(); 
 
       document.getElementById('stop-results').style.display = 'none';
       document.getElementById('route-details').style.display = 'none';
+      currentBusDelayInSeconds = null; // NUEVO: Resetear retraso
+      document.getElementById('delay-info').textContent = ''; // NUEVO: Limpiar info de retraso
+
 
       try {
         const resp = await fetch("https://bizkaibus.onrender.com/bizkaibus");
@@ -372,9 +417,7 @@
           );
           if (!coincide) continue;
 
-          // Usar la función auxiliar para limpiar el nombre de la parada
           const paradaTexto = getCleanStopName(sp);
-
           const infoBus = busInfoMap.get(vref) || { matricula: "—", modelo: "—", fecha: "—"};
 
           const marcador = L.marker([lat, lon]).addTo(map);
@@ -415,18 +458,21 @@
             return alert("Parada no encontrada. Introduce un ID de parada válido.");
         }
 
-        // Limpia los marcadores de la búsqueda de línea anterior y otros elementos
         clearLineSearchMarkers();
-        clearMapElements(); 
+        clearMapElements();  
 
         document.getElementById('route-details').style.display = 'none';
+        currentBusDelayInSeconds = null; // NUEVO: Resetear retraso
+        document.getElementById('delay-info').textContent = ''; // NUEVO: Limpiar info de retraso
 
         const busListDiv = document.getElementById("bus-list");
         busListDiv.innerHTML = "Cargando próximos autobuses...";
         document.getElementById('stop-results').style.display = 'block';
+        document.getElementById('stop-results').querySelector('h2').textContent = `Próximos autobuses en parada: ${getCleanStopName(stopId)} (${stopId})`;
+
 
         const now = new Date();
-        const currentDayOfWeek = now.getDay();
+        const currentDayOfWeek = now.getDay(); // 0 (Domingo) a 6 (Sábado)
         const currentYear = now.getFullYear();
         const currentMonth = (now.getMonth() + 1).toString().padStart(2, '0');
         const currentDay = now.getDate().toString().padStart(2, '0');
@@ -434,7 +480,6 @@
         const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
 
         const upcomingBuses = [];
-
         const stopTimesAtThisStop = stopTimesData.filter(st => st.stop_id === stopId);
 
         for (const st of stopTimesAtThisStop) {
@@ -457,13 +502,13 @@
 
             let runsToday = false;
 
-            if (currentException === 1) {
+            if (currentException === 1) { // Servicio añadido para esta fecha
                 runsToday = true;
-            } else if (currentException === 2) {
+            } else if (currentException === 2) { // Servicio eliminado para esta fecha
                 runsToday = false;
-            } else {
+            } else { // Comprobar día de la semana normal
                 switch (currentDayOfWeek) {
-                    case 0: runsToday = service.sunday === 1; break;
+                    case 0: runsToday = service.sunday === 1; break; // Domingo
                     case 1: runsToday = service.monday === 1; break;
                     case 2: runsToday = service.tuesday === 1; break;
                     case 3: runsToday = service.wednesday === 1; break;
@@ -481,7 +526,7 @@
                     hora: st.departure_time,
                     destino: trip.trip_headsign,
                     trip_id: st.trip_id,
-                    shape_id: trip.shape_id
+                    shape_id: trip.shape_id 
                 });
             }
         }
@@ -492,13 +537,11 @@
         if (upcomingBuses.length > 0) {
             const stopInfo = stopsData.get(stopId);
             if (stopInfo) {
-                // Usar la función auxiliar para limpiar el nombre de la parada
                 const paradaTexto = getCleanStopName(stopId);
-
                 const stopMarker = L.marker([stopInfo.stop_lat, stopInfo.stop_lon]).addTo(map);
-                // Usar paradaTexto sin el ID duplicado
                 stopMarker.bindPopup(`<b>Parada:</b> ${paradaTexto} (${stopId})`).openPopup();
-                markers.push(stopMarker); 
+                // MODIFICADO: usamos stopMarkers para poder limpiarlos selectivamente
+                stopMarkers.push(stopMarker); 
                 map.setView([stopInfo.stop_lat, stopInfo.stop_lon], 15);
             }
 
@@ -512,7 +555,6 @@
                 `;
                 busOption.onclick = () => {
                     console.log("Trip ID seleccionado:", bus.trip_id);
-                    // Ahora mostrarRecorrido también se encargará de llamar a localizarBusEnTiempoReal
                     mostrarRecorrido(bus.trip_id, bus.shape_id); 
                 };
                 busListDiv.appendChild(busOption);
@@ -522,17 +564,16 @@
         }
     }
 
-    // Función que localiza un bus en tiempo real y lo marca con el icono de bus rojo
-    // Ahora puede recibir targetTripId O targetVehicleRef
     async function localizarBusEnTiempoReal(targetTripId = null, targetVehicleRef = null) {
-        // Lógica de validación
+        currentBusDelayInSeconds = null; // NUEVO: Resetear retraso al inicio de cada localización
+        document.getElementById('delay-info').textContent = ''; // NUEVO: Limpiar info de retraso
+
         if (!targetTripId && !targetVehicleRef) {
             console.error("localizarBusEnTiempoReal: Se requiere targetTripId o targetVehicleRef.");
-            alert("No se puede localizar el bus sin un identificador.");
-            return;
+            // No alertar aquí, ya que puede ser una llamada interna
+            return null; 
         }
 
-        // Si ya hay un marcador de bus en tiempo real, lo eliminamos antes de añadir el nuevo.
         if (realTimeBusMarker) {
             map.removeLayer(realTimeBusMarker);
             realTimeBusMarker = null;
@@ -546,28 +587,27 @@
 
             let busEncontrado = false;
             let currentBusLat, currentBusLon;
-            let currentTripId = null; // Variable para almacenar el trip_id encontrado
+            let foundTripIdForBus = null;
 
             for (let act of actividades) {
-                const jref = act.querySelector("VehicleJourneyRef")?.textContent.trim(); // Trip ID
-                const vref = act.querySelector("VehicleRef")?.textContent.trim(); // VehicleRef (número de bus)
+                const jref = act.querySelector("VehicleJourneyRef")?.textContent.trim(); 
+                const vref = act.querySelector("VehicleRef")?.textContent.trim(); 
                 const lat = parseFloat(act.querySelector("Latitude")?.textContent);
                 const lon = parseFloat(act.querySelector("Longitude")?.textContent);
                 const spRef = act.querySelector("StopPointRef")?.textContent.trim();
+                // NUEVO: Obtener RecordedAtTime para cálculo de retraso
+                const recordedAtTimeISO = act.querySelector("RecordedAtTime")?.textContent.trim();
+
 
                 if (!isNaN(lat) && !isNaN(lon)) {
-                    // Condición para encontrar el bus: por tripId o por VehicleRef
                     const condicionCumplida = 
                         (targetTripId && jref === targetTripId) ||
                         (targetVehicleRef && vref === targetVehicleRef);
 
                     if (condicionCumplida) {
                         const infoBus = busInfoMap.get(vref) || { matricula: "—", modelo: "—", fecha: "—"};
-                        
-                        // Usar la función auxiliar para limpiar el nombre de la parada
                         const paradaActualNombre = getCleanStopName(spRef);
 
-                        // Obtener Route ID y Headsign si no vienen del targetTripId
                         let lineaDisplay = 'N/A';
                         let destinoDisplay = 'N/A';
                         if (jref && tripsData.has(jref)) {
@@ -575,14 +615,12 @@
                             destinoDisplay = tripsData.get(jref).trip_headsign || 'N/A';
                         }
                         
-                        // Crea el marcador con el icono de bus rojo
                         realTimeBusMarker = L.marker([lat, lon], { icon: busIcon }).addTo(map);
-                        // Usar paradaActualNombre sin el ID duplicado
                         realTimeBusMarker.bindPopup(`
                             <b>¡Autobús en tiempo real!</b><br>
                             <b>Línea:</b> ${lineaDisplay}<br>
                             <b>Destino:</b> ${destinoDisplay}<br>
-                            <b>En parada:</b> ${paradaActualNombre} (${spRef || 'N/A'})<br>
+                            <b>Ref. Parada actual/sig:</b> ${paradaActualNombre} (${spRef || 'N/A'})<br>
                             <b>Bus Nº:</b> ${vref}<br>
                             <b>Matrícula:</b> ${infoBus.matricula}<br>
                             <b>Modelo:</b> ${infoBus.modelo}<br>
@@ -591,9 +629,47 @@
                         busEncontrado = true;
                         currentBusLat = lat;
                         currentBusLon = lon;
-                        currentTripId = jref; // Almacenar el trip_id del bus encontrado
-                        console.log("Autobús en tiempo real localizado:", { tripId: jref, vref: vref, lat, lon });
-                        break;
+                        foundTripIdForBus = jref; 
+
+                        // --- NUEVO: Cálculo del retraso ---
+                        if (recordedAtTimeISO && spRef && jref) {
+                            const tripStopTimes = stopTimesData.filter(st => st.trip_id === jref && st.stop_id === spRef);
+                            if (tripStopTimes.length > 0) {
+                                const scheduledArrivalTimeStr = tripStopTimes[0].arrival_time; // Asumimos la primera coincidencia
+                                const scheduledArrivalSeconds = timeToSeconds(scheduledArrivalTimeStr);
+                                
+                                // Extraer HH:MM:SS de la fecha ISO (asumimos que es hora local o comparable)
+                                const realTimeDate = new Date(recordedAtTimeISO);
+                                const realTimeStr = `${realTimeDate.getHours().toString().padStart(2, '0')}:${realTimeDate.getMinutes().toString().padStart(2, '0')}:${realTimeDate.getSeconds().toString().padStart(2, '0')}`;
+                                const realTimeSeconds = timeToSeconds(realTimeStr);
+
+                                if (scheduledArrivalSeconds > 0 && realTimeSeconds > 0) {
+                                    currentBusDelayInSeconds = realTimeSeconds - scheduledArrivalSeconds;
+                                    console.log(`Retraso calculado para bus ${vref} (trip ${jref}) en parada ${spRef}: ${currentBusDelayInSeconds}s. Real: ${realTimeStr}, Prog: ${scheduledArrivalTimeStr}`);
+                                    
+                                    const delayInfoEl = document.getElementById('delay-info');
+                                    if (currentBusDelayInSeconds > 60) {
+                                        delayInfoEl.textContent = `Retraso estimado: ${Math.round(currentBusDelayInSeconds / 60)} minutos.`;
+                                        delayInfoEl.style.color = 'red';
+                                    } else if (currentBusDelayInSeconds < -60) {
+                                        delayInfoEl.textContent = `Adelanto estimado: ${Math.round(Math.abs(currentBusDelayInSeconds) / 60)} minutos.`;
+                                        delayInfoEl.style.color = 'green';
+                                    } else if (currentBusDelayInSeconds !== 0) {
+                                        delayInfoEl.textContent = `En hora (aprox. ${currentBusDelayInSeconds}s ${currentBusDelayInSeconds > 0 ? 'tarde' : 'pronto'}).`;
+                                        delayInfoEl.style.color = 'orange';
+                                    } else {
+                                        delayInfoEl.textContent = "En hora (según última actualización).";
+                                        delayInfoEl.style.color = 'green';
+                                    }
+                                } else {
+                                   console.warn("No se pudo calcular el retraso: tiempos inválidos.", {scheduledArrivalTimeStr, realTimeStr});
+                                }
+                            } else {
+                                console.warn(`No se encontró el stop_time para trip ${jref} y stop ${spRef} para calcular retraso.`);
+                            }
+                        }
+                        // --- FIN NUEVO: Cálculo del retraso ---
+                        break; 
                     }
                 }
             }
@@ -602,25 +678,35 @@
                 let msg = `No se encontró el autobús`;
                 if (targetTripId) msg += ` con el trip ID ${targetTripId}`;
                 if (targetVehicleRef) msg += ` con el número ${targetVehicleRef}`;
-                msg += ` en tiempo real. Puede que no esté circulando actualmente o no se estén recibiendo sus datos.`;
-                alert(msg);
+                msg += ` en tiempo real.`;
+                // No mostramos alert aquí, podría ser una búsqueda interna
                 console.warn(msg);
-                return null; // Retornar null si no se encontró
+                currentBusDelayInSeconds = null; // Asegurar que está nulo
+                document.getElementById('delay-info').textContent = 'Autobús no localizado en tiempo real.';
+                document.getElementById('delay-info').style.color = 'black';
+                return null;
             } else {
-                // Ajustar el mapa para incluir el bus en tiempo real junto con el recorrido y paradas.
                 let currentBounds = map.getBounds();
-                if (currentBounds.isValid() && (currentBounds.contains([currentBusLat, currentBusLon]))) {
-                    // Si el bus ya está en la vista actual (por un recorrido o parada), no cambiamos el zoom
-                } else {
-                    map.setView([currentBusLat, currentBusLon], 15); // Zoom a la ubicación del bus
+                if (!currentBounds.contains([currentBusLat, currentBusLon])) {
+                     // Solo centrar si el bus no está visible junto con el recorrido, si ya hay uno
+                    if (!linePolylines.length > 0) { // Si no hay polilínea de recorrido, centrar en el bus
+                        map.setView([currentBusLat, currentBusLon], 15);
+                    } else { // Si hay recorrido, intentar extender los bounds para incluirlo
+                        let routeBounds = linePolylines[0].getBounds(); // Asumimos una polilínea principal
+                        routeBounds.extend([currentBusLat, currentBusLon]);
+                        map.fitBounds(routeBounds, { padding: [70, 70]});
+                    }
                 }
-                return currentTripId; // Retornar el trip_id del bus encontrado
+                return foundTripIdForBus; // Retornar el trip_id del bus encontrado
             }
 
         } catch (e) {
             console.error("Error al localizar el bus en tiempo real:", e);
             alert("Error al intentar obtener la ubicación en tiempo real del autobús.");
-            return null; // Retornar null en caso de error
+            currentBusDelayInSeconds = null; // Asegurar
+            document.getElementById('delay-info').textContent = 'Error obteniendo datos en tiempo real.';
+            document.getElementById('delay-info').style.color = 'black';
+            return null;
         }
     }
 
@@ -632,44 +718,42 @@
             return;
         }
 
-        // Limpia todos los elementos anteriores del mapa y los resultados de búsqueda
         clearMapElements();
         clearLineSearchMarkers();
         document.getElementById('stop-results').style.display = 'none';
-        document.getElementById('route-details').style.display = 'none';
+        document.getElementById('route-details').style.display = 'none'; // Ocultar detalles por defecto
+        currentBusDelayInSeconds = null; // NUEVO: Resetear retraso
+        document.getElementById('delay-info').textContent = '';
 
-        // Llama a localizarBusEnTiempoReal con el número de bus
-        // Esta función ahora devuelve el trip_id si lo encuentra
+
         const foundTripId = await localizarBusEnTiempoReal(null, numBus);
 
         if (foundTripId) {
-            // Si se encontró el bus y su trip_id, mostrar el recorrido
             const tripInfo = tripsData.get(foundTripId);
             if (tripInfo) {
+                // mostrarRecorrido ahora usará el currentBusDelayInSeconds calculado en localizarBusEnTiempoReal
                 mostrarRecorrido(foundTripId, tripInfo.shape_id);
             } else {
                 console.warn(`Trip ID ${foundTripId} encontrado para el bus ${numBus}, pero no se encontraron sus detalles en tripsData.`);
+                alert(`Se encontró el bus ${numBus} pero no se pudo cargar su recorrido completo (faltan datos del viaje).`);
+                document.getElementById('route-details').style.display = 'none';
             }
+        } else {
+             document.getElementById('route-details').style.display = 'none'; // Asegurar que está oculto si no se encuentra
         }
     }
 
 
     async function mostrarRecorrido(tripId, shapeId) {
-        // Limpiar solo los elementos de la búsqueda de línea (buses en tiempo real)
         clearLineSearchMarkers();
-        // Limpiar los marcadores de parada y polilíneas para dibujar el nuevo recorrido
+        // No limpiar todo el mapa aquí, solo paradas y polilíneas previas de *otro* recorrido.
+        // El bus en tiempo real (realTimeBusMarker) se gestiona por localizarBusEnTiempoReal
         stopMarkers.forEach(m => map.removeLayer(m));
         stopMarkers = [];
         linePolylines.forEach(poly => map.removeLayer(poly));
         linePolylines = [];
-        // Limpiar el marcador del bus en tiempo real anterior, si lo hay
-        // NO lo borramos aquí, porque localizarBusEnTiempoReal ya lo hace y lo posiciona.
-        // Si venimos de buscarBusPorNumero, el bus ya está puesto.
-        // Si venimos de buscarBusesPorParada, el bus se pondrá al final.
-        // if (realTimeBusMarker) {
-        //     map.removeLayer(realTimeBusMarker);
-        //     realTimeBusMarker = null;
-        // }
+        // No borramos realTimeBusMarker aquí, localizarBusEnTiempoReal se encarga
+        // y necesitamos la información de currentBusDelayInSeconds que pudo haber establecido.
 
         document.getElementById('stop-results').style.display = 'none';
         document.getElementById('route-details').style.display = 'block';
@@ -677,6 +761,7 @@
         const trip = tripsData.get(tripId);
         if (!trip) {
             alert("Información del viaje no encontrada.");
+            document.getElementById('route-details').style.display = 'none';
             return;
         }
 
@@ -695,21 +780,31 @@
         for (const st of stopsOnRoute) {
             const stopInfo = stopsData.get(st.stop_id);
             if (stopInfo) {
-                // Usar la función auxiliar para limpiar el nombre de la parada
                 const paradaTexto = getCleanStopName(st.stop_id);
-
                 const li = document.createElement("li");
-                li.innerHTML = `<b>${st.arrival_time}</b> - ${paradaTexto} (${st.stop_id})`; 
+
+                // MODIFICADO: Añadir hora estimada si hay retraso
+                let estimatedTimeHtml = "";
+                if (currentBusDelayInSeconds !== null) {
+                    const scheduledSeconds = timeToSeconds(st.arrival_time);
+                    if (scheduledSeconds > 0) { // Solo si hay hora programada válida
+                        const estimatedSeconds = scheduledSeconds + currentBusDelayInSeconds;
+                        const estimatedTimeStr = secondsToTime(estimatedSeconds);
+                        estimatedTimeHtml = ` <span class="estimated-time">(Est: ${estimatedTimeStr})</span>`;
+                    }
+                }
+                
+                li.innerHTML = `<span class="scheduled-time">${st.arrival_time}</span>${estimatedTimeHtml} - ${paradaTexto} (${st.stop_id})`;  
                 routeStopList.appendChild(li);
 
                 const marker = L.marker([stopInfo.stop_lat, stopInfo.stop_lon]).addTo(map);
                 marker.bindPopup(`
                     <b>Parada:</b> ${paradaTexto}<br>
                     <b>ID:</b> ${st.stop_id}<br>
-                    <b>Hora de llegada:</b> ${st.arrival_time}<br>
-                    <b>Hora de salida:</b> ${st.departure_time}
+                    <b>Hora llegada prog.:</b> ${st.arrival_time}<br>
+                    <b>Hora salida prog.:</b> ${st.departure_time}
                 `);
-                stopMarkers.push(marker); 
+                stopMarkers.push(marker);  
                 bounds.extend([stopInfo.stop_lat, stopInfo.stop_lon]);
                 polylinePoints.push([stopInfo.stop_lat, stopInfo.stop_lon]);
             }
@@ -719,26 +814,99 @@
             const color = COLORS[Math.floor(Math.random() * COLORS.length)];
             const polyline = L.polyline(polylinePoints, { color: color, weight: 5, opacity: 0.7 }).addTo(map);
             linePolylines.push(polyline);
-            // Ajustar el mapa para mostrar el recorrido programado
-            map.fitBounds(bounds, { padding: [50, 50] });
+            if (bounds.isValid()) { // Solo ajustar si hay bounds válidos
+                 map.fitBounds(bounds, { padding: [50, 50] });
+            }
         } else {
             alert("No se encontraron paradas para este recorrido programado.");
+            // No ocultar route-details aquí, puede que el bus sí se haya localizado.
         }
 
-        // Si la llamada a mostrarRecorrido no vino de buscarBusPorNumero,
-        // entonces llamamos a localizarBusEnTiempoReal para este tripId.
-        // Si ya viene de buscarBusPorNumero, el bus ya está localizado.
-        // Lo que hacemos es verificar si realTimeBusMarker ya existe y tiene el tripId correcto
-        // para evitar relocalizar y mover el mapa innecesariamente.
-        if (!realTimeBusMarker || tripsData.get(realTimeBusMarker.options.popup.getContent().match(/<b>Línea:<\/b>\s*([^<]+)/)?.[1]) !== trip.route_id) {
-            localizarBusEnTiempoReal(tripId, null); 
+        // MODIFICADO: Llamar a localizarBusEnTiempoReal si no se llamó desde buscarBusPorNumero
+        // o si el bus localizado no corresponde a este tripId.
+        // La variable currentBusDelayInSeconds ya se habrá establecido (o no) por la llamada a localizarBus...
+        // que precede a mostrarRecorrido (en buscarBusPorNumero) o la que se hace aquí abajo.
+        let busIsAlreadyCorrectlyMarked = false;
+        if (realTimeBusMarker && realTimeBusMarker.getPopup()) {
+            const popupContent = realTimeBusMarker.getPopup().getContent();
+            // Intentar extraer el trip ID del popup del bus en tiempo real
+            // Esto es un poco frágil, depende del formato del popup.
+            // Sería mejor si almacenamos el tripId del bus en tiempo real en una variable global.
+            // Por ahora, intentamos parsearlo
+            const match = popupContent.match(/bizkaibus\.onrender\.com\/bizkaibus[^>]*>\s*([^<]+)<\/a>/); // Esto es muy específico y puede fallar
+            // Una forma más robusta sería obtener el trip ID desde el propio objeto del marcador si lo hubiéramos guardado.
+            // Por ahora, si `localizarBusEnTiempoReal` ya se ejecutó por `buscarBusPorNumero`
+            // y `currentBusDelayInSeconds` está puesto, asumimos que es el bus correcto.
+            // Esta lógica es para cuando se selecciona un bus desde la lista de paradas.
+
+            // Si el tripId del bus en tiempo real (obtenido del popup) coincide con el tripId actual,
+            // y ya tenemos información de retraso, no hace falta volver a localizar.
+            // Esta lógica es compleja de hacer robusta sin guardar el tripId del bus en tiempo real explícitamente.
+            // Simplificación: Si currentBusDelayInSeconds no es null, es porque localizarBusEnTiempoReal ya se ejecutó
+            // para este tripId (o el vehículo que realiza este tripId).
+        }
+
+        // Si venimos de seleccionar un bus de la lista de una parada (buscarBusesPorParada -> click en busOption):
+        // O si el `currentBusDelayInSeconds` es null (no se ha localizado aún este trip).
+        // No hay una forma 100% fiable de saber si `realTimeBusMarker` corresponde al `tripId` actual
+        // sin almacenar explícitamente el tripId del `realTimeBusMarker`.
+        // La forma más segura es siempre intentar localizarlo si el origen no fue `buscarBusPorNumero`.
+        // Si `currentBusDelayInSeconds` ya tiene un valor, significa que `localizarBusEnTiempoReal`
+        // ya fue llamado para este `tripId` (o el vehículo que lo está operando), así que la información de retraso es relevante.
+        // Si es `null`, necesitamos obtenerla.
+        
+        let shouldLocalize = true;
+        // Si el marcador de bus en tiempo real existe, y su trip ID (necesitaríamos guardarlo) es el mismo, y hay info de retraso, no localizar.
+        // Simplificamos: si no hay info de retraso O no hay marcador, localizamos.
+        // Si el marcador existe pero no tenemos info de retraso, también localizamos para obtenerla.
+        if (currentBusDelayInSeconds === null) {
+            console.log("No hay info de retraso, localizando bus para trip:", tripId);
+            await localizarBusEnTiempoReal(tripId, null);
+            // Como localizarBusEnTiempoReal ahora actualiza currentBusDelayInSeconds,
+            // necesitamos volver a renderizar la lista de paradas para que muestre las estimaciones.
+            // Esto podría causar un doble renderizado si `localizarBusEnTiempoReal` es rápido.
+            // Una mejor solución sería que localizarBusEnTiempoReal devuelva el retraso y lo pasemos aquí.
+            // Por ahora, volvemos a llamar a la parte de renderizado de la lista:
+            if (currentBusDelayInSeconds !== null) { // Si se encontró el bus y se calculó el retraso
+                routeStopList.innerHTML = ""; // Limpiar de nuevo
+                let newBoundsForFit = new L.LatLngBounds(); // Recalcular bounds para el fit
+                
+                stopsOnRoute.forEach(st => {
+                    const stopInfo = stopsData.get(st.stop_id);
+                    if (stopInfo) {
+                        const paradaTexto = getCleanStopName(st.stop_id);
+                        const li = document.createElement("li");
+                        let estimatedTimeHtmlRecalc = "";
+                        const scheduledSecondsRecalc = timeToSeconds(st.arrival_time);
+                        if (scheduledSecondsRecalc > 0) {
+                            const estimatedSecondsRecalc = scheduledSecondsRecalc + currentBusDelayInSeconds;
+                            const estimatedTimeStrRecalc = secondsToTime(estimatedSecondsRecalc);
+                            estimatedTimeHtmlRecalc = ` <span class="estimated-time">(Est: ${estimatedTimeStrRecalc})</span>`;
+                        }
+                        li.innerHTML = `<span class="scheduled-time">${st.arrival_time}</span>${estimatedTimeHtmlRecalc} - ${paradaTexto} (${st.stop_id})`;
+                        routeStopList.appendChild(li);
+                        newBoundsForFit.extend([stopInfo.stop_lat, stopInfo.stop_lon]); // Extender bounds
+                    }
+                });
+                 if (realTimeBusMarker && newBoundsForFit.isValid()) {
+                    newBoundsForFit.extend(realTimeBusMarker.getLatLng());
+                    map.fitBounds(newBoundsForFit, { padding: [70,70] });
+                } else if (newBoundsForFit.isValid()){
+                    map.fitBounds(newBoundsForFit, { padding: [50,50] });
+                }
+            }
+        } else if (realTimeBusMarker && bounds.isValid()) {
+            // Si ya hay bus y retraso, solo ajustar el zoom para incluirlo si es necesario
+            bounds.extend(realTimeBusMarker.getLatLng());
+            map.fitBounds(bounds, { padding: [70,70] });
         }
     }
 
     window.onload = async () => {
-      await Promise.all([cargarBusInfo(), cargarDatosGTFS()]); 
+      await Promise.all([cargarBusInfo(), cargarDatosGTFS()]);  
       document.getElementById('stop-results').style.display = 'none';
       document.getElementById('route-details').style.display = 'none';
+      document.getElementById('delay-info').textContent = ''; // NUEVO
     };
   </script>
 </body>
