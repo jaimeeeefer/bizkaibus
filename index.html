@@ -88,6 +88,7 @@
         flex-basis: 35%;
         min-width: 120px;
         text-align: right;
+         font-weight: bold;
     }
 
     .delay-text-stop-list {
@@ -642,7 +643,7 @@
                             } else if (delayMinutes < -1) { 
                                 delayStatusText = `<span class="delay-text-stop-list advance">(${delayMinutes}m)</span>`;
                             } else if (delayMinutes !== 0) { 
-                                delayStatusText = `<span class="delay-text-stop-list on-time">(${delayMinutes > 0 ? '+' : ''}${delayMinutes}m)</span>`;
+                                delayStatusText = `<span class="delay-text-stop-list on-time">(En hora)</span>`;
                             }
                         }
                     }
