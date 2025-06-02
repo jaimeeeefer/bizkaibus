@@ -201,10 +201,10 @@
     // --- Funciones Auxiliares ---
     function getCleanStopName(stopId) {
         const stopInfo = stopsData.get(stopId);
-        if (stopInfo && stopInfo.stop_name) { // Comprobar que stop_name existe
+        if (stopInfo && stopInfo.stop_name) {
             const name = stopInfo.stop_name;
             const regex = new RegExp(`\\s*\\(${stopId}\\)$`);
-            return name.replace(regex, '').replace(/"/g, ''); // Limpiar comillas
+            return name.replace(regex, '').replace(/"/g, ''); 
         }
         return "Parada Desconocida";
     }
@@ -246,7 +246,7 @@
         let encontrados = 0;
         let bounds = new L.LatLngBounds();
 
-        for (let act of actividades) {
+        for (const act of actividades) {
           const jref = act.querySelector("VehicleJourneyRef")?.textContent.trim().toUpperCase();
           const vref = act.querySelector("VehicleRef")?.textContent.trim();
           const lat = parseFloat(act.querySelector("Latitude")?.textContent);
@@ -337,10 +337,17 @@
             const rtResp = await fetch("https://bizkaibus.onrender.com/bizkaibus");
             const rtXmlText = await rtResp.text();
             const rtXml = new DOMParser().parseFromString(rtXmlText, "application/xml");
-            rtXml.getElementsByTagName("VehicleActivity").forEach(act => {
+            // --- CORRECCIÓN AQUÍ: Usar for...of en lugar de forEach ---
+            const rtActivityElements = rtXml.getElementsByTagName("VehicleActivity");
+            for (const act of rtActivityElements) {
                 const jref = act.querySelector("VehicleJourneyRef")?.textContent.trim();
-                if (jref) realTimeActivities.set(jref, { stopPointRef: act.querySelector("StopPointRef")?.textContent.trim(), recordedAtTimeISO: act.querySelector("RecordedAtTime")?.textContent.trim() });
-            });
+                if (jref) {
+                    realTimeActivities.set(jref, { 
+                        stopPointRef: act.querySelector("StopPointRef")?.textContent.trim(), 
+                        recordedAtTimeISO: act.querySelector("RecordedAtTime")?.textContent.trim() 
+                    });
+                }
+            }
         } catch (e) { console.warn("No se pudieron obtener datos en tiempo real para estimaciones.", e); }
 
         if (upcomingBuses.length > 0) {
@@ -390,7 +397,7 @@
         try {
             const resp = await fetch("https://bizkaibus.onrender.com/bizkaibus");
             const xml = new DOMParser().parseFromString(await resp.text(), "application/xml");
-            for (let act of xml.getElementsByTagName("VehicleActivity")) {
+            for (const act of xml.getElementsByTagName("VehicleActivity")) {
                 const jref = act.querySelector("VehicleJourneyRef")?.textContent.trim(); 
                 const vref = act.querySelector("VehicleRef")?.textContent.trim(); 
                 if ((targetTripId && jref === targetTripId) || (targetVehicleRef && vref === targetVehicleRef)) {
@@ -524,7 +531,6 @@
             textStops.trim().split("\n").slice(1).forEach(row => {
                 const r = row.split(","); 
                 if (r[0] && r.length >= 6) {
-                    // LA LÍNEA CRÍTICA CORREGIDA:
                     stopsData.set(r[0].trim(), { stop_name: r[2]?.trim(), stop_lat: parseFloat(r[4]), stop_lon: parseFloat(r[5]) });
                 }
             });
