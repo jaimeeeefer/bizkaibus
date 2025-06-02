@@ -47,25 +47,19 @@
       border: 1px solid #ddd;
       margin-bottom: 0.5em;
       cursor: pointer;
-      /* display: flex; */ /* Modificado abajo */
-      /* justify-content: space-between; */ /* Modificado abajo */
-      /* align-items: center; */ /* Modificado abajo */
     }
     .bus-option:hover {
       background-color: #e0e0e0;
     }
-    /* .bus-option span { */ /* Modificado abajo */
-      /* font-weight: bold; */
-    /* } */
 
-    #stop-results .bus-option { /* Asegurar especificidad */
+    #stop-results .bus-option {
         display: flex;
         justify-content: space-between;
         align-items: center;
         padding: 0.5em;
     }
 
-    #stop-results .bus-option span { /* Estilo base para los spans internos */
+    #stop-results .bus-option span {
         padding: 0 0.25em; 
         font-weight: normal; 
     }
@@ -88,6 +82,7 @@
         flex-basis: 35%;
         min-width: 120px;
         text-align: right;
+         font-weight: bold;
     }
 
     .delay-text-stop-list {
@@ -167,13 +162,12 @@
   <script>
     // Autenticación básica por prompt
     const USUARIO = "admin";
-    const CONTRASENA = "bizkaibus123"; // Recuerda cambiar esto en un entorno real
+    const CONTRASENA = "bizkaibus123";
 
     function autenticar() {
       const yaAutenticado = localStorage.getItem("autenticado");
 
       if (yaAutenticado === "true") {
-        // console.log("Autenticación exitosa (desde localStorage).");
         return;
       }
 
@@ -182,7 +176,6 @@
 
       if (u === USUARIO && p === CONTRASENA) {
         localStorage.setItem("autenticado", "true");
-        // console.log("Autenticación exitosa (nueva).");
       } else {
         alert("Acceso denegado. Recarga la página para intentarlo de nuevo.");
         document.body.innerHTML = "<h1>401 No autorizado</h1><p>Por favor, recarga la página e introduce las credenciales correctas.</p>";
@@ -208,10 +201,10 @@
       attribution: "© OpenStreetMap contributors",
     }).addTo(map);
 
-    let markers = []; // Para marcadores de búsqueda de buses por línea
-    let stopMarkers = []; // Para marcadores de paradas de un recorrido o parada individual
-    let realTimeBusMarker = null; // Para el marcador del bus en tiempo real (rojo)
-    let linePolylines = []; // Para las polilíneas de los recorridos
+    let markers = [];
+    let stopMarkers = [];
+    let realTimeBusMarker = null;
+    let linePolylines = [];
 
     let stopsData = new Map();
     let busInfoMap = new Map();
@@ -220,9 +213,8 @@
     let calendarData = new Map();
     let calendarDatesData = new Map();
 
-    // Variables globales para información del bus actualmente seguido
     let currentBusDelayInSeconds = null; 
-    let currentBusStopIdRealTime = null; // ID de la parada (StopPointRef) del bus en tiempo real
+    let currentBusStopIdRealTime = null;
 
     const COLORS = ['#FF0000', '#0000FF', '#008000', '#FFA500', '#800080', '#00FFFF', '#FF00FF', '#808080'];
 
@@ -250,7 +242,7 @@
 
         if (remainingSeconds < 0) {
             remainingSeconds += secondsInDay;
-            days -=1; 
+            days -=1;
         }
         
         const h = Math.floor(remainingSeconds / 3600);
@@ -268,7 +260,6 @@
 
     async function cargarDatosGTFS() {
       try {
-        // console.log("Iniciando carga de stops.txt desde:", STOPS_URL);
         const resStops = await fetch(STOPS_URL);
         const textStops = await resStops.text();
         const rowsStops = textStops.trim().split("\n").map(row => row.split(","));
@@ -281,11 +272,8 @@
                 stop_lat: parseFloat(row[4]),
                 stop_lon: parseFloat(row[5]),
               });
-          } else {
-              // console.warn("Skipping malformed or incomplete row in stops.txt:", row);
           }
         });
-        // console.log("stopsData map size after loading:", stopsData.size);
 
         const stopTimesPromises = [
             fetch(STOP_TIMES1_URL).then(res => res.text()),
@@ -308,14 +296,13 @@
                 }
             });
         });
-        // console.log("Total stopTimes loaded:", stopTimesData.length);
 
         const resTrips = await fetch(TRIPS_URL);
         const textTrips = await resTrips.text();
         const rowsTrips = textTrips.trim().split("\n").map(row => row.split(","));
         rowsTrips.slice(1).forEach(row => {
           if (row.length >= 8) {
-              tripsData.set(row[2]?.trim(), { // trip_id as key
+              tripsData.set(row[2]?.trim(), {
                 route_id: row[0]?.trim(),
                 service_id: row[1]?.trim(),
                 trip_headsign: row[3]?.trim(),
@@ -323,14 +310,13 @@
               });
           }
         });
-        // console.log("Total trips loaded:", tripsData.size);
 
         const resCalendar = await fetch(CALENDAR_URL);
         const textCalendar = await resCalendar.text();
         const rowsCalendar = textCalendar.trim().split("\n").map(row => row.split(","));
         rowsCalendar.slice(1).forEach(row => {
             if (row.length >= 10) {
-                calendarData.set(row[0]?.trim(), { // service_id as key
+                calendarData.set(row[0]?.trim(), {
                     monday: parseInt(row[1]),
                     tuesday: parseInt(row[2]),
                     wednesday: parseInt(row[3]),
@@ -343,7 +329,6 @@
                 });
             }
         });
-        // console.log("Total calendar services loaded:", calendarData.size);
 
         const resCalendarDates = await fetch(CALENDAR_DATES_URL);
         const textCalendarDates = await resCalendarDates.text();
@@ -360,7 +345,6 @@
                 calendarDatesData.get(service_id).set(date, exception_type);
             }
         });
-        // console.log("Total calendar_dates loaded (unique service_id with exceptions):", calendarDatesData.size);
         console.log("Carga de datos GTFS completada.");
       } catch (e) {
         console.error("Error cargando datos GTFS:", e);
@@ -382,7 +366,6 @@
             });
           }
         });
-        // console.log("Total bus info loaded:", busInfoMap.size);
       } catch (e) {
         console.error("Error cargando busInfo:", e);
       }
@@ -435,7 +418,6 @@
 
       document.getElementById('stop-results').style.display = 'none';
       document.getElementById('route-details').style.display = 'none';
-      // currentBusDelayInSeconds y currentBusStopIdRealTime se limpian en clearMapElements
 
       try {
         const resp = await fetch("https://bizkaibus.onrender.com/bizkaibus");
@@ -466,7 +448,7 @@
           const paradaTexto = sp ? getCleanStopName(sp) : "N/D";
           const infoBus = busInfoMap.get(vref) || { matricula: "—", modelo: "—", fecha: "—"};
 
-          const marcador = L.marker([lat, lon]).addTo(map); // Marcadores azules por defecto
+          const marcador = L.marker([lat, lon]).addTo(map);
           marcador.bindPopup(`
             <b>Línea:</b> ${lineaLimpia}<br>
             <b>Parada actual/sig.:</b> ${paradaTexto} ${sp ? '('+sp+')' : ''}<br>
@@ -475,7 +457,7 @@
             <b>Modelo:</b> ${infoBus.modelo}<br>
             <b>Fecha matriculación:</b> ${infoBus.fecha}
           `);
-          markers.push(marcador); // Añadir a la lista de marcadores de línea
+          markers.push(marcador);
           bounds.extend([lat, lon]);
           encontrados++;
         }
@@ -501,7 +483,6 @@
         const stopId = stopIdInput;
         
         if (!stopsData.has(stopId)) {
-            // console.error(`La parada con ID "${stopId}" NO se encontró en stopsData.`);
             return alert("Parada no encontrada. Introduce un ID de parada válido.");
         }
 
@@ -509,7 +490,6 @@
         clearMapElements();  
 
         document.getElementById('route-details').style.display = 'none';
-        // currentBus... se limpian en clearMapElements
 
         const busListDiv = document.getElementById("bus-list");
         busListDiv.innerHTML = "Cargando próximos autobuses...";
@@ -524,6 +504,28 @@
         const currentDay = now.getDate().toString().padStart(2, '0');
         const currentDate = `${currentYear}${currentMonth}${currentDay}`;
         const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+
+        const realTimeActivities = new Map();
+        try {
+            const rtResp = await fetch("https://bizkaibus.onrender.com/bizkaibus");
+            const rtXmlText = await rtResp.text();
+            const rtXml = new DOMParser().parseFromString(rtXmlText, "application/xml");
+            const rtActivityElements = rtXml.getElementsByTagName("VehicleActivity");
+
+            for (let act of rtActivityElements) {
+                const jref = act.querySelector("VehicleJourneyRef")?.textContent.trim();
+                const spRef = act.querySelector("StopPointRef")?.textContent.trim();
+                const recordedAtTimeISO = act.querySelector("RecordedAtTime")?.textContent.trim();
+                if (jref && spRef && recordedAtTimeISO) {
+                    realTimeActivities.set(jref, {
+                        stopPointRef: spRef,
+                        recordedAtTimeISO: recordedAtTimeISO
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn("No se pudieron obtener datos en tiempo real para estimaciones en lista de paradas:", e);
+        }
 
         const upcomingBuses = [];
         const stopTimesAtThisStop = stopTimesData.filter(st => st.stop_id === stopId);
@@ -566,10 +568,49 @@
             
             if (!runsToday) continue;
 
-            if (st.departure_time > currentTime) {
+            let estimatedDepartureSeconds = timeToSeconds(st.departure_time);
+            let delayStatusText = "";
+            let isBusOnTime = false;
+
+            if (realTimeActivities.has(st.trip_id)) {
+                const liveBusData = realTimeActivities.get(st.trip_id);
+                const liveBusStopSchedule = stopTimesData.find(
+                    rtSt => rtSt.trip_id === st.trip_id && rtSt.stop_id === liveBusData.stopPointRef
+                );
+
+                if (liveBusStopSchedule && liveBusData.recordedAtTimeISO) {
+                    const scheduledTimeAtLiveBusStopSeconds = timeToSeconds(liveBusStopSchedule.arrival_time);
+                    const realTimeDate = new Date(liveBusData.recordedAtTimeISO);
+                    const actualTimeAtLiveBusStopStr = `${realTimeDate.getHours().toString().padStart(2, '0')}:${realTimeDate.getMinutes().toString().padStart(2, '0')}:${realTimeDate.getSeconds().toString().padStart(2, '0')}`;
+                    const actualTimeAtLiveBusStopSeconds = timeToSeconds(actualTimeAtLiveBusStopStr);
+
+                    if (scheduledTimeAtLiveBusStopSeconds > 0 && actualTimeAtLiveBusStopSeconds > 0) {
+                        const delayAtLiveBusStopSeconds = actualTimeAtLiveBusStopSeconds - scheduledTimeAtLiveBusStopSeconds;
+                        estimatedDepartureSeconds = timeToSeconds(st.departure_time) + delayAtLiveBusStopSeconds;
+                        
+                        const delayMinutes = Math.round(delayAtLiveBusStopSeconds / 60);
+
+                        if (delayMinutes > 1) { 
+                            delayStatusText = `<span class="delay-text-stop-list delay">(+${delayMinutes}m)</span>`;
+                        } else if (delayMinutes < -1) { 
+                            delayStatusText = `<span class="delay-text-stop-list advance">(${delayMinutes}m)</span>`;
+                        } else {
+                            isBusOnTime = true;
+                            delayStatusText = `<span class="delay-text-stop-list on-time">(En hora)</span>`;
+                        }
+                    }
+                }
+            }
+
+            const currentSeconds = timeToSeconds(currentTime);
+            if (estimatedDepartureSeconds >= currentSeconds) {
                 upcomingBuses.push({
                     linea: trip.route_id,
-                    hora: st.departure_time, 
+                    hora: st.departure_time,
+                    estimatedDepartureSeconds: estimatedDepartureSeconds,
+                    estimatedDepartureTimeDisplay: secondsToTime(estimatedDepartureSeconds).substring(0, 5),
+                    delayText: delayStatusText,
+                    isBusOnTime: isBusOnTime,
                     destino: trip.trip_headsign,
                     trip_id: st.trip_id,
                     shape_id: trip.shape_id 
@@ -577,29 +618,8 @@
             }
         }
 
-        upcomingBuses.sort((a, b) => a.hora.localeCompare(b.hora));
+        upcomingBuses.sort((a, b) => a.estimatedDepartureSeconds - b.estimatedDepartureSeconds);
         busListDiv.innerHTML = ""; 
-
-        const realTimeActivities = new Map();
-        try {
-            const rtResp = await fetch("https://bizkaibus.onrender.com/bizkaibus");
-            const rtXmlText = await rtResp.text();
-            const rtXml = new DOMParser().parseFromString(rtXmlText, "application/xml");
-            const rtActivityElements = rtXml.getElementsByTagName("VehicleActivity");
-
-            for (let act of rtActivityElements) {
-                const jref = act.querySelector("VehicleJourneyRef")?.textContent.trim();
-                if (jref) {
-                    realTimeActivities.set(jref, { 
-                        vehicleRef: act.querySelector("VehicleRef")?.textContent.trim(),
-                        stopPointRef: act.querySelector("StopPointRef")?.textContent.trim(), 
-                        recordedAtTimeISO: act.querySelector("RecordedAtTime")?.textContent.trim() 
-                    });
-                }
-            }
-        } catch (e) {
-            console.warn("No se pudieron obtener datos en tiempo real para estimaciones en lista de paradas:", e);
-        }
 
         if (upcomingBuses.length > 0) {
             const stopInfo = stopsData.get(stopId);
@@ -615,41 +635,18 @@
                 const busOption = document.createElement("div");
                 busOption.classList.add("bus-option");
 
-                let scheduledTimeDisplay = bus.hora; 
-                let delayStatusText = "";
-
-                if (realTimeActivities.has(bus.trip_id)) {
-                    const liveBusData = realTimeActivities.get(bus.trip_id); 
-                    
-                    const liveBusStopSchedule = stopTimesData.find(
-                        st => st.trip_id === bus.trip_id && st.stop_id === liveBusData.stopPointRef
-                    );
-
-                    if (liveBusStopSchedule && liveBusData.recordedAtTimeISO) {
-                        const scheduledTimeAtLiveBusStopStr = liveBusStopSchedule.arrival_time; 
-                        const scheduledTimeAtLiveBusStopSeconds = timeToSeconds(scheduledTimeAtLiveBusStopStr);
-
-                        const realTimeDate = new Date(liveBusData.recordedAtTimeISO);
-                        const actualTimeAtLiveBusStopStr = `${realTimeDate.getHours().toString().padStart(2, '0')}:${realTimeDate.getMinutes().toString().padStart(2, '0')}:${realTimeDate.getSeconds().toString().padStart(2, '0')}`;
-                        const actualTimeAtLiveBusStopSeconds = timeToSeconds(actualTimeAtLiveBusStopStr);
-
-                        if (scheduledTimeAtLiveBusStopSeconds > 0 && actualTimeAtLiveBusStopSeconds > 0) {
-                            const delayAtLiveBusStopSeconds = actualTimeAtLiveBusStopSeconds - scheduledTimeAtLiveBusStopSeconds;
-                            const delayMinutes = Math.round(delayAtLiveBusStopSeconds / 60);
-
-                            if (delayMinutes > 1) { 
-                                delayStatusText = `<span class="delay-text-stop-list delay">(+${delayMinutes}m)</span>`;
-                            } else if (delayMinutes < -1) { 
-                                delayStatusText = `<span class="delay-text-stop-list advance">(${Math.abs(delayMinutes)}m)</span>`;
-                            } else if (delayMinutes !== 0) { 
-                                delayStatusText = `<span class="delay-text-stop-list on-time">(${delayMinutes > 0 ? '+' : ''}${delayMinutes}m)</span>`;
-                            }
-                        }
-                    }
+                let timeDisplay = `Prog.: ${bus.hora.substring(0, 5)}`;
+                if (bus.delayText && !bus.isBusOnTime) { // Solo muestra la hora estimada si hay texto de retraso y no está en hora
+                    timeDisplay += ` Est.: ${bus.estimatedDepartureTimeDisplay}`;
                 }
+                if (bus.delayText) { // Siempre muestra el estado de retraso
+                    timeDisplay += ` ${bus.delayText}`;
+                }
+
+
                 busOption.innerHTML = `
                     <span class="bus-option-linea">Línea: ${bus.linea}</span>
-                    <span class="bus-option-hora">${scheduledTimeDisplay}${delayStatusText}</span>
+                    <span class="bus-option-hora">${timeDisplay}</span>
                     <span class="bus-option-destino">Destino: ${bus.destino}</span>
                 `;
                 busOption.onclick = () => {
@@ -658,7 +655,7 @@
                 busListDiv.appendChild(busOption);
             });
         } else {
-            busListDiv.innerHTML = `<p>No hay próximos autobuses programados para esta parada hoy (${currentTime.substring(0,5)}).</p>`;
+            busListDiv.innerHTML = `<p>No hay próximos autobuses programados o en tiempo real para esta parada hoy (${currentTime.substring(0,5)}).</p>`;
         }
     }
 
@@ -667,7 +664,6 @@
         let localBusStopIdRealTime = null;
 
         if (!targetTripId && !targetVehicleRef) {
-            // console.error("localizarBusEnTiempoReal: Se requiere targetTripId o targetVehicleRef.");
             return null; 
         }
 
@@ -716,7 +712,7 @@
                             <b>¡Autobús en tiempo real!</b><br>
                             <b>Línea:</b> ${lineaDisplay}<br>
                             <b>Destino:</b> ${destinoDisplay}<br>
-                            <b>Ref. Parada actual/sig:</b> ${paradaActualNombre} ${spRef ? '('+spRef+')' : ''}<br>
+                            <b>Parada actual/sig:</b> ${paradaActualNombre} ${spRef ? '('+spRef+')' : ''}<br>
                             <b>Bus Nº:</b> ${vref}<br>
                             <b>Matrícula:</b> ${infoBus.matricula}<br>
                             <b>Modelo:</b> ${infoBus.modelo}<br>
@@ -782,7 +778,7 @@
                         } else { 
                             map.setView(busLatLng, 15);
                         }
-                    } else { // No hay polilínea, solo centrar en el bus
+                    } else {
                          map.setView(busLatLng, 15);
                     }
                 }
@@ -810,7 +806,6 @@
         clearLineSearchMarkers();
         document.getElementById('stop-results').style.display = 'none';
         document.getElementById('route-details').style.display = 'none'; 
-        // document.getElementById('delay-info').textContent = ''; // Limpiado en clearMapElements
 
         const foundTripId = await localizarBusEnTiempoReal(null, numBus);
 
@@ -827,7 +822,9 @@
         }
     }
 
-    function renderRouteStopList(tripId, stopsOnRoute) {
+    async function renderRouteStopList(tripId, stopsOnRoute) { // Ojo: este tripId es de la ruta, no de cada parada individual
+    debugger; // <-- AÑADE ESTO
+    console.log("DEBUG: Entrando en renderRouteStopList con tripId:", tripId);
         const routeStopList = document.getElementById('route-stop-list');
         routeStopList.innerHTML = ""; 
         let listBounds = new L.LatLngBounds(); 
@@ -844,7 +841,11 @@
                     if (scheduledSeconds > 0) {
                         const estimatedSeconds = scheduledSeconds + currentBusDelayInSeconds;
                         const estimatedTimeStr = secondsToTime(estimatedSeconds);
-                        estimatedTimeHtml = ` <span class="estimated-time">(Est: ${estimatedTimeStr})</span>`;
+                        if (Math.abs(currentBusDelayInSeconds) > 60) {
+                             estimatedTimeHtml = ` <span class="estimated-time">(Est: ${estimatedTimeStr})</span>`;
+                        } else {
+                            estimatedTimeHtml = ` <span class="estimated-time">(En hora)</span>`;
+                        }
                     }
                 }
                 
