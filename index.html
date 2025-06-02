@@ -152,6 +152,7 @@
   
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
+    // --- URLs y Variables Globales ---
     const SHEET_TSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYeZkna4mwxp3p2azwTgAPcjeSBoUU_rhWW5gVZ7hqotNtojQOHtsjbEnnlJbrijBVwck_kWERE__6/pub?output=tsv"; 
     const STOPS_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibusparadas/main/stops.txt";
     const STOP_TIMES1_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibusparadas/main/stop_times1.txt";
@@ -166,17 +167,8 @@
       attribution: "© OpenStreetMap contributors",
     }).addTo(map);
 
-    let markers = [];
-    let stopMarkers = [];
-    let realTimeBusMarker = null;
-    let linePolylines = [];
-
-    let stopsData = new Map();
-    let busInfoMap = new Map();
-    let stopTimesData = [];
-    let tripsData = new Map();
-    let calendarData = new Map();
-    let calendarDatesData = new Map();
+    let markers = [], stopMarkers = [], realTimeBusMarker = null, linePolylines = [];
+    let stopsData = new Map(), busInfoMap = new Map(), stopTimesData = [], tripsData = new Map(), calendarData = new Map(), calendarDatesData = new Map();
 
     const COLORS = ['#FF0000', '#0000FF', '#008000', '#FFA500', '#800080', '#00FFFF', '#FF00FF', '#808080'];
     const busIcon = L.icon({
@@ -206,79 +198,210 @@
         return `${h}:${m}:${s}${days !== 0 ? ` (${days > 0 ? '+' : ''}${days}d)` : ''}`;
     }
 
-    // --- Carga de Datos GTFS y de Buses ---
-    // (Estas funciones no cambian, se omiten por brevedad en la explicación, pero están en el código)
-    async function cargarDatosGTFS() { /* ...código sin cambios... */ }
-    async function cargarBusInfo() { /* ...código sin cambios... */ }
-
     // --- Funciones Auxiliares ---
-    function getCleanStopName(stopId) { /* ...código sin cambios... */ }
-    function extraerNumero(texto) { /* ...código sin cambios... */ }
+    function getCleanStopName(stopId) {
+        const stopInfo = stopsData.get(stopId);
+        if (stopInfo && stopInfo.stop_name) { // Comprobar que stop_name existe
+            const name = stopInfo.stop_name;
+            const regex = new RegExp(`\\s*\\(${stopId}\\)$`);
+            return name.replace(regex, '').replace(/"/g, ''); // Limpiar comillas
+        }
+        return "Parada Desconocida";
+    }
+    function extraerNumero(texto) {
+      const m = texto.match(/\d+/);
+      return m ? m[0] : null;
+    }
 
     // --- Funciones de Limpieza del Mapa ---
     function clearMapElements() {
         document.getElementById('delay-info').textContent = ''; 
-        if (realTimeBusMarker) {
-            map.removeLayer(realTimeBusMarker);
-            realTimeBusMarker = null;
-        }
-        linePolylines.forEach(poly => map.removeLayer(poly));
-        linePolylines = [];
-        stopMarkers.forEach(m => map.removeLayer(m));
-        stopMarkers = [];
+        if (realTimeBusMarker) { map.removeLayer(realTimeBusMarker); realTimeBusMarker = null; }
+        linePolylines.forEach(poly => map.removeLayer(poly)); linePolylines = [];
+        stopMarkers.forEach(m => map.removeLayer(m)); stopMarkers = [];
     }
     function clearLineSearchMarkers() {
-        markers.forEach(m => map.removeLayer(m));
-        markers = []; 
+        markers.forEach(m => map.removeLayer(m)); markers = []; 
+    }
+    
+    // --- Funciones de Búsqueda Principales ---
+    async function buscarBusesPorLinea() {
+      const inputRaw = document.getElementById("linea").value.trim();
+      if (!inputRaw) return alert("Introduce un número de línea válido");
+
+      const input = inputRaw.toUpperCase();
+      const inputNum = extraerNumero(inputRaw);
+
+      clearMapElements(); 
+      clearLineSearchMarkers(); 
+
+      document.getElementById('stop-results').style.display = 'none';
+      document.getElementById('route-details').style.display = 'none';
+
+      try {
+        const resp = await fetch("https://bizkaibus.onrender.com/bizkaibus");
+        const xmlText = await resp.text();
+        const xml = new DOMParser().parseFromString(xmlText, "application/xml");
+        const actividades = xml.getElementsByTagName("VehicleActivity");
+        let encontrados = 0;
+        let bounds = new L.LatLngBounds();
+
+        for (let act of actividades) {
+          const jref = act.querySelector("VehicleJourneyRef")?.textContent.trim().toUpperCase();
+          const vref = act.querySelector("VehicleRef")?.textContent.trim();
+          const lat = parseFloat(act.querySelector("Latitude")?.textContent);
+          const lon = parseFloat(act.querySelector("Longitude")?.textContent);
+          const sp = act.querySelector("StopPointRef")?.textContent.trim();
+
+          if (!jref || !vref || isNaN(lat) || isNaN(lon)) continue;
+
+          const match = jref.match(/A\d{3,4}/);
+          const lineaLimpia = match ? match[0] : jref;
+          const lineaNum = extraerNumero(lineaLimpia);
+          const coincide = (lineaLimpia === input || (inputNum && lineaNum === inputNum));
+          
+          if (!coincide) continue;
+
+          const paradaTexto = sp ? getCleanStopName(sp) : "N/D";
+          const infoBus = busInfoMap.get(vref) || { matricula: "—", modelo: "—", fecha: "—"};
+
+          const marcador = L.marker([lat, lon]).addTo(map);
+          marcador.bindPopup(`<b>Línea:</b> ${lineaLimpia}<br><b>Parada actual/sig.:</b> ${paradaTexto} ${sp ? '('+sp+')' : ''}<br><b>Bus:</b> ${vref}<br><b>Matrícula:</b> ${infoBus.matricula}<br><b>Modelo:</b> ${infoBus.modelo}`);
+          markers.push(marcador);
+          bounds.extend([lat, lon]);
+          encontrados++;
+        }
+
+        if (!encontrados) {
+          alert("No se encontraron buses en tiempo real para esa línea.");
+        } else if (bounds.isValid()) {
+            map.fitBounds(bounds, { padding: [50, 50] });
+        }
+      } catch (e) {
+        console.error("Error en buscarBusesPorLinea:", e);
+        alert("Error al descargar o procesar datos de Bizkaibus.");
+      }
     }
 
-    // --- Funciones de Búsqueda Principales ---
-    async function buscarBusesPorLinea() { /* ...código sin cambios... */ }
-    async function buscarBusesPorParada() { /* ...código sin cambios... */ }
-    
-    // --- FUNCIONES REFACTORIZADAS Y CORREGIDAS ---
+    async function buscarBusesPorParada() {
+        const stopIdInput = document.getElementById("parada").value.trim();
+        if (!stopIdInput) return alert("Introduce un número de parada válido.");
+        const stopId = stopIdInput;
+        
+        if (!stopsData.has(stopId)) return alert("Parada no encontrada. Introduce un ID de parada válido.");
 
+        clearLineSearchMarkers();
+        clearMapElements();  
+        document.getElementById('route-details').style.display = 'none';
+
+        const busListDiv = document.getElementById("bus-list");
+        busListDiv.innerHTML = "Cargando próximos autobuses...";
+        document.getElementById('stop-results').style.display = 'block';
+        const stopNameForTitle = getCleanStopName(stopId);
+        document.getElementById('stop-results').querySelector('h2').textContent = `Próximos autobuses en parada: ${stopNameForTitle} (${stopId})`;
+
+        const now = new Date();
+        const currentDayOfWeek = now.getDay(); 
+        const currentDate = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}`;
+        const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+
+        const upcomingBuses = [];
+        const stopTimesAtThisStop = stopTimesData.filter(st => st.stop_id === stopId);
+
+        for (const st of stopTimesAtThisStop) {
+            const trip = tripsData.get(st.trip_id);
+            if (!trip) continue;
+            const service = calendarData.get(trip.service_id);
+            if (!service) continue;
+            if (parseInt(currentDate) < parseInt(service.start_date) || parseInt(currentDate) > parseInt(service.end_date)) continue;
+
+            const serviceExceptions = calendarDatesData.get(trip.service_id);
+            const currentException = serviceExceptions ? serviceExceptions.get(currentDate) : undefined;
+            let runsToday = false;
+            if (currentException === 1) runsToday = true;
+            else if (currentException === 2) runsToday = false;
+            else {
+                const dayMap = [service.sunday, service.monday, service.tuesday, service.wednesday, service.thursday, service.friday, service.saturday];
+                runsToday = dayMap[currentDayOfWeek] === 1;
+            }
+            if (runsToday && st.departure_time > currentTime) {
+                upcomingBuses.push({ linea: trip.route_id, hora: st.departure_time, destino: trip.trip_headsign, trip_id: st.trip_id, shape_id: trip.shape_id });
+            }
+        }
+
+        upcomingBuses.sort((a, b) => a.hora.localeCompare(b.hora));
+        busListDiv.innerHTML = ""; 
+
+        const realTimeActivities = new Map();
+        try {
+            const rtResp = await fetch("https://bizkaibus.onrender.com/bizkaibus");
+            const rtXmlText = await rtResp.text();
+            const rtXml = new DOMParser().parseFromString(rtXmlText, "application/xml");
+            rtXml.getElementsByTagName("VehicleActivity").forEach(act => {
+                const jref = act.querySelector("VehicleJourneyRef")?.textContent.trim();
+                if (jref) realTimeActivities.set(jref, { stopPointRef: act.querySelector("StopPointRef")?.textContent.trim(), recordedAtTimeISO: act.querySelector("RecordedAtTime")?.textContent.trim() });
+            });
+        } catch (e) { console.warn("No se pudieron obtener datos en tiempo real para estimaciones.", e); }
+
+        if (upcomingBuses.length > 0) {
+            const stopInfo = stopsData.get(stopId);
+            if (stopInfo) { 
+                const stopMarker = L.marker([stopInfo.stop_lat, stopInfo.stop_lon]).addTo(map);
+                stopMarker.bindPopup(`<b>Parada:</b> ${getCleanStopName(stopId)} (${stopId})`).openPopup();
+                stopMarkers.push(stopMarker); 
+                map.setView([stopInfo.stop_lat, stopInfo.stop_lon], 15);
+            }
+
+            upcomingBuses.slice(0, 15).forEach(bus => { 
+                const busOption = document.createElement("div");
+                busOption.classList.add("bus-option");
+                let delayStatusText = "";
+                if (realTimeActivities.has(bus.trip_id)) {
+                    const liveBusData = realTimeActivities.get(bus.trip_id); 
+                    const liveBusStopSchedule = stopTimesData.find(st => st.trip_id === bus.trip_id && st.stop_id === liveBusData.stopPointRef);
+                    if (liveBusStopSchedule && liveBusData.recordedAtTimeISO) {
+                        const scheduledSeconds = timeToSeconds(liveBusStopSchedule.arrival_time);
+                        const realTimeDate = new Date(liveBusData.recordedAtTimeISO);
+                        const actualSeconds = timeToSeconds(`${realTimeDate.getHours().toString().padStart(2, '0')}:${realTimeDate.getMinutes().toString().padStart(2, '0')}:${realTimeDate.getSeconds().toString().padStart(2, '0')}`);
+                        if (scheduledSeconds > 0 && actualSeconds > 0) {
+                            const delayMinutes = Math.round((actualSeconds - scheduledSeconds) / 60);
+                            if (delayMinutes > 1) delayStatusText = `<span class="delay-text-stop-list delay">(+${delayMinutes}m)</span>`;
+                            else if (delayMinutes < -1) delayStatusText = `<span class="delay-text-stop-list advance">(${Math.abs(delayMinutes)}m)</span>`;
+                            else if (delayMinutes !== 0) delayStatusText = `<span class="delay-text-stop-list on-time">(${delayMinutes > 0 ? '+' : ''}${delayMinutes}m)</span>`;
+                        }
+                    }
+                }
+                busOption.innerHTML = `<span class="bus-option-linea">Línea: ${bus.linea}</span><span class="bus-option-hora">${bus.hora}${delayStatusText}</span><span class="bus-option-destino">Destino: ${bus.destino}</span>`;
+                busOption.onclick = () => { mostrarRecorrido(bus.trip_id, bus.shape_id); };
+                busListDiv.appendChild(busOption);
+            });
+        } else {
+            busListDiv.innerHTML = `<p>No hay próximos autobuses programados para esta parada hoy (${currentTime.substring(0,5)}).</p>`;
+        }
+    }
+    
+    // --- Lógica Central de Visualización y Tiempo Real ---
+    
     async function localizarBusEnTiempoReal(targetTripId = null, targetVehicleRef = null) {
         if (!targetTripId && !targetVehicleRef) return null;
-
-        if (realTimeBusMarker) {
-            map.removeLayer(realTimeBusMarker);
-            realTimeBusMarker = null;
-        }
+        if (realTimeBusMarker) map.removeLayer(realTimeBusMarker);
         document.getElementById('delay-info').textContent = "Localizando...";
 
         try {
             const resp = await fetch("https://bizkaibus.onrender.com/bizkaibus");
-            const xmlText = await resp.text();
-            const xml = new DOMParser().parseFromString(xmlText, "application/xml");
-            const actividades = xml.getElementsByTagName("VehicleActivity");
-
-            for (let act of actividades) {
+            const xml = new DOMParser().parseFromString(await resp.text(), "application/xml");
+            for (let act of xml.getElementsByTagName("VehicleActivity")) {
                 const jref = act.querySelector("VehicleJourneyRef")?.textContent.trim(); 
                 const vref = act.querySelector("VehicleRef")?.textContent.trim(); 
-                
-                const condicionCumplida = (targetTripId && jref === targetTripId) || (targetVehicleRef && vref === targetVehicleRef);
-
-                if (condicionCumplida) {
-                    const lat = parseFloat(act.querySelector("Latitude")?.textContent);
-                    const lon = parseFloat(act.querySelector("Longitude")?.textContent);
+                if ((targetTripId && jref === targetTripId) || (targetVehicleRef && vref === targetVehicleRef)) {
+                    const lat = parseFloat(act.querySelector("Latitude")?.textContent), lon = parseFloat(act.querySelector("Longitude")?.textContent);
+                    if (isNaN(lat) || isNaN(lon)) continue;
+                    
                     const spRef = act.querySelector("StopPointRef")?.textContent.trim();
                     const recordedAtTimeISO = act.querySelector("RecordedAtTime")?.textContent.trim();
-
-                    if (isNaN(lat) || isNaN(lon)) continue;
-
-                    // El bus fue encontrado, ahora calculamos su información
-                    const infoBus = busInfoMap.get(vref) || { matricula: "—", modelo: "—", fecha: "—"};
-                    const paradaActualNombre = spRef ? getCleanStopName(spRef) : "N/D";
-                    let lineaDisplay = 'N/A', destinoDisplay = 'N/A';
                     const tripInfo = tripsData.get(jref);
-                    if (tripInfo) {
-                        lineaDisplay = tripInfo.route_id || 'N/A';
-                        destinoDisplay = tripInfo.trip_headsign || 'N/A';
-                    }
-                    
                     realTimeBusMarker = L.marker([lat, lon], { icon: busIcon }).addTo(map);
-                    realTimeBusMarker.bindPopup(`<b>¡Autobús en tiempo real!</b><br><b>Línea:</b> ${lineaDisplay}<br><b>Bus Nº:</b> ${vref}<br><b>En/Cerca de:</b> ${paradaActualNombre} (${spRef || 'N/A'})`).openPopup();
+                    realTimeBusMarker.bindPopup(`<b>¡Bus en tiempo real!</b><br><b>Línea:</b> ${tripInfo?.route_id || 'N/A'}<br><b>Bus:</b> ${vref}<br><b>En/Cerca de:</b> ${getCleanStopName(spRef)}`).openPopup();
                     
                     let delayInSeconds = null;
                     if (recordedAtTimeISO && spRef && jref) {
@@ -286,41 +409,28 @@
                         if (tripStopTime) {
                             const scheduledSeconds = timeToSeconds(tripStopTime.arrival_time);
                             const realTimeDate = new Date(recordedAtTimeISO);
-                            const realTimeStr = `${realTimeDate.getHours().toString().padStart(2, '0')}:${realTimeDate.getMinutes().toString().padStart(2, '0')}:${realTimeDate.getSeconds().toString().padStart(2, '0')}`;
-                            const realTimeSeconds = timeToSeconds(realTimeStr);
-                            if (scheduledSeconds > 0 && realTimeSeconds > 0) {
-                                delayInSeconds = realTimeSeconds - scheduledSeconds;
-                            }
+                            const realTimeSeconds = timeToSeconds(`${realTimeDate.getHours().toString().padStart(2, '0')}:${realTimeDate.getMinutes().toString().padStart(2, '0')}:${realTimeDate.getSeconds().toString().padStart(2, '0')}`);
+                            if (scheduledSeconds > 0) delayInSeconds = realTimeSeconds - scheduledSeconds;
                         }
                     }
                     
                     const delayInfoEl = document.getElementById('delay-info');
                     if(delayInSeconds !== null) {
                         const delayMinutes = Math.round(delayInSeconds / 60);
-                        if (delayMinutes > 1) {
-                            delayInfoEl.textContent = `Retraso estimado: ${delayMinutes} minutos.`;
-                            delayInfoEl.style.color = 'red';
-                        } else if (delayMinutes < -1) {
-                            delayInfoEl.textContent = `Adelanto estimado: ${Math.abs(delayMinutes)} minutos.`;
-                            delayInfoEl.style.color = 'green';
-                        } else {
-                            delayInfoEl.textContent = `En hora (desviación < 2 min).`;
-                            delayInfoEl.style.color = 'orange';
-                        }
+                        if (delayMinutes > 1) { delayInfoEl.textContent = `Retraso estimado: ${delayMinutes} minutos.`; delayInfoEl.style.color = 'red'; } 
+                        else if (delayMinutes < -1) { delayInfoEl.textContent = `Adelanto estimado: ${Math.abs(delayMinutes)} minutos.`; delayInfoEl.style.color = 'green'; }
+                        else { delayInfoEl.textContent = `En hora (desviación < 2 min).`; delayInfoEl.style.color = 'orange'; }
                     } else {
-                        delayInfoEl.textContent = 'Posición localizada, pero sin estimación de puntualidad.';
+                        delayInfoEl.textContent = 'Posición localizada, puntualidad no disponible.';
                     }
-
-                    return { tripId: jref, stopId: spRef, delayInSeconds: delayInSeconds, position: { lat, lon } };
+                    return { tripId: jref, stopId: spRef, delayInSeconds, position: { lat, lon } };
                 }
             }
-            
             document.getElementById('delay-info').textContent = 'Autobús no localizado en tiempo real.';
-            return null; // Bus no encontrado en el bucle
-
+            return null;
         } catch (e) {
-            console.error("Error al localizar el bus en tiempo real:", e);
             document.getElementById('delay-info').textContent = 'Error obteniendo datos en tiempo real.';
+            console.error("Error al localizar el bus en tiempo real:", e);
             return null;
         }
     }
@@ -328,21 +438,14 @@
     async function buscarBusPorNumero() {
         const numBus = document.getElementById("numBus").value.trim();
         if (!numBus) return alert("Introduce un número de bus válido.");
-
         clearMapElements(); 
         clearLineSearchMarkers();
         document.getElementById('stop-results').style.display = 'none';
-        
         const busRealTimeData = await localizarBusEnTiempoReal(null, numBus);
-
-        if (busRealTimeData && busRealTimeData.tripId) {
+        if (busRealTimeData?.tripId) {
             const tripInfo = tripsData.get(busRealTimeData.tripId);
-            if (tripInfo) {
-                mostrarRecorrido(busRealTimeData.tripId, tripInfo.shape_id, busRealTimeData);
-            } else {
-                alert(`Se encontró el bus ${numBus} pero no se pudo cargar su recorrido completo.`);
-                document.getElementById('route-details').style.display = 'none';
-            }
+            if (tripInfo) mostrarRecorrido(busRealTimeData.tripId, tripInfo.shape_id, busRealTimeData);
+            else { alert(`Se encontró el bus ${numBus} pero no se pudo cargar su recorrido.`); document.getElementById('route-details').style.display = 'none'; }
         } else {
              document.getElementById('route-details').style.display = 'none'; 
         }
@@ -351,46 +454,24 @@
     function renderRouteStopList(stopsOnRoute, delayInSeconds, currentStopId) {
         const routeStopList = document.getElementById('route-stop-list');
         routeStopList.innerHTML = ""; 
-
         stopsOnRoute.forEach(st => {
-            const stopInfo = stopsData.get(st.stop_id);
-            if (stopInfo) {
-                const paradaTexto = getCleanStopName(st.stop_id);
-                const li = document.createElement("li");
-
-                let estimatedTimeHtml = "";
-                if (delayInSeconds !== null) { 
-                    const scheduledSeconds = timeToSeconds(st.arrival_time);
-                    if (scheduledSeconds > 0) {
-                        const estimatedSeconds = scheduledSeconds + delayInSeconds;
-                        const estimatedTimeStr = secondsToTime(estimatedSeconds);
-                        estimatedTimeHtml = ` <span class="estimated-time">(Est: ${estimatedTimeStr})</span>`;
-                    }
+            const li = document.createElement("li");
+            let estimatedTimeHtml = "";
+            if (delayInSeconds !== null) { 
+                const scheduledSeconds = timeToSeconds(st.arrival_time);
+                if (scheduledSeconds > 0) {
+                    estimatedTimeHtml = ` <span class="estimated-time">(Est: ${secondsToTime(scheduledSeconds + delayInSeconds)})</span>`;
                 }
-                
-                const waypointIconHtml = (currentStopId && st.stop_id === currentStopId)
-                    ? ` <span class="waypoint-icon" title="Ubicación actual/próxima reportada">📍</span>`
-                    : "";
-                
-                li.innerHTML = `<span class="scheduled-time">${st.arrival_time}</span>${estimatedTimeHtml} - ${paradaTexto} (${st.stop_id})${waypointIconHtml}`;  
-                routeStopList.appendChild(li);
             }
+            const waypointIconHtml = (currentStopId && st.stop_id === currentStopId) ? ` <span class="waypoint-icon" title="Ubicación reportada">📍</span>` : "";
+            li.innerHTML = `<span class="scheduled-time">${st.arrival_time}</span>${estimatedTimeHtml} - ${getCleanStopName(st.stop_id)} (${st.stop_id})${waypointIconHtml}`;  
+            routeStopList.appendChild(li);
         });
     }
 
     async function mostrarRecorrido(tripId, shapeId, busRealTimeData = null) {
         clearLineSearchMarkers();
-        stopMarkers.forEach(m => map.removeLayer(m));
-        stopMarkers = [];
-        linePolylines.forEach(poly => map.removeLayer(poly));
-        linePolylines = [];
-
-        // Si ya hay un bus de una búsqueda anterior, lo limpiamos, localizarBusEnTiempoReal pondrá el nuevo si lo encuentra
-        if (realTimeBusMarker) {
-            map.removeLayer(realTimeBusMarker);
-            realTimeBusMarker = null;
-        }
-
+        clearMapElements();
         document.getElementById('stop-results').style.display = 'none';
         document.getElementById('route-details').style.display = 'block';
 
@@ -404,18 +485,12 @@
         document.getElementById('route-line-name').textContent = trip.route_id;
         document.getElementById('route-headsign').textContent = trip.trip_headsign;
         
-        const stopsOnRoute = stopTimesData
-            .filter(st => st.trip_id === tripId)
-            .sort((a, b) => a.stop_sequence - b.stop_sequence);
+        const stopsOnRoute = stopTimesData.filter(st => st.trip_id === tripId).sort((a, b) => a.stop_sequence - b.stop_sequence);
 
-        // Si no tenemos datos en tiempo real (p.ej. click desde lista de parada), los buscamos.
         let liveData = busRealTimeData;
-        if (!liveData) {
-            liveData = await localizarBusEnTiempoReal(tripId, null);
-        }
+        if (!liveData) liveData = await localizarBusEnTiempoReal(tripId, null);
 
-        // Renderizar la lista de paradas CON la información en tiempo real que tengamos.
-        renderRouteStopList(stopsOnRoute, liveData ? liveData.delayInSeconds : null, liveData ? liveData.stopId : null);
+        renderRouteStopList(stopsOnRoute, liveData?.delayInSeconds, liveData?.stopId);
         
         const mapElementsBounds = new L.LatLngBounds(); 
         const polylinePoints = [];
@@ -423,8 +498,8 @@
         stopsOnRoute.forEach(st => {
             const stopInfo = stopsData.get(st.stop_id);
             if (stopInfo) {
-                 const marker = L.marker([stopInfo.stop_lat, stopInfo.stop_lon]).addTo(map);
-                 marker.bindPopup(`<b>Parada:</b> ${getCleanStopName(st.stop_id)}<br><b>ID:</b> ${st.stop_id}<br><b>Hora prog.:</b> ${st.arrival_time}`);
+                const marker = L.marker([stopInfo.stop_lat, stopInfo.stop_lon]).addTo(map);
+                marker.bindPopup(`<b>Parada:</b> ${getCleanStopName(st.stop_id)}<br><b>ID:</b> ${st.stop_id}<br><b>Hora prog.:</b> ${st.arrival_time}`);
                 stopMarkers.push(marker);
                 polylinePoints.push([stopInfo.stop_lat, stopInfo.stop_lon]);
                 mapElementsBounds.extend([stopInfo.stop_lat, stopInfo.stop_lon]);
@@ -433,71 +508,41 @@
 
         if (polylinePoints.length > 0) {
             const color = COLORS[Math.floor(Math.random() * COLORS.length)];
-            const polyline = L.polyline(polylinePoints, { color: color, weight: 5, opacity: 0.7 }).addTo(map);
-            linePolylines.push(polyline);
+            linePolylines.push(L.polyline(polylinePoints, { color, weight: 5, opacity: 0.7 }).addTo(map));
         }
         
-        // Ajustar el mapa para que se vea todo
-        if (liveData && liveData.position) {
-            mapElementsBounds.extend(L.latLng(liveData.position.lat, liveData.position.lon));
-        }
+        if (liveData?.position) mapElementsBounds.extend(L.latLng(liveData.position.lat, liveData.position.lon));
 
-        if (mapElementsBounds.isValid()) {
-            map.fitBounds(mapElementsBounds, { padding: [70, 70] });
-        } else if (liveData && liveData.position) {
-            map.setView([liveData.position.lat, liveData.position.lon], 15);
-        }
+        if (mapElementsBounds.isValid()) map.fitBounds(mapElementsBounds, { padding: [70, 70] });
+        else if (liveData?.position) map.setView([liveData.position.lat, liveData.position.lon], 15);
     }
 
     // --- Carga Inicial ---
-    window.onload = async () => {
-      // Se omite el código idéntico de carga por brevedad
-    };
-    
-    // --- Pegar aquí el contenido completo de las funciones omitidas por brevedad ---
-    Object.assign(window, {
-      getCleanStopName, extraerNumero, buscarBusesPorLinea, buscarBusesPorParada, buscarBusPorNumero, mostrarRecorrido,
-      // Añade las funciones de carga que se omitieron arriba
-      cargarDatosGTFS, cargarBusInfo
-    });
-
-    // Código completo de funciones omitidas para que funcione al copiar y pegar
     async function cargarDatosGTFS() {
         try {
             const resStops = await fetch(STOPS_URL); const textStops = await resStops.text();
             textStops.trim().split("\n").slice(1).forEach(row => {
-                const r = row.split(","); if (r[0] && r.length >= 6) stopsData.set(r[0].trim(), { stop_name: r[2]?.trim(), stop_lat: parseFloat(r[4]), stop_lon: parseFloat(r[5]) });
-            });
-            const stopTimesTexts = await Promise.all([fetch(STOP_TIMES1_URL).then(res => res.text()), fetch(STOP_TIMES2_URL).then(res => res.text()), fetch(STOP_TIMES3_URL).then(res => res.text())]);
-            stopTimesTexts.forEach(text => {
-                text.trim().split("\n").slice(1).forEach(row => {
-                    const r = row.split(","); if (r.length >= 5) stopTimesData.push({ trip_id: r[0]?.trim(), arrival_time: r[1]?.trim(), departure_time: r[2]?.trim(), stop_id: r[3]?.trim(), stop_sequence: parseInt(r[4]) });
-                });
-            });
-            const resTrips = await fetch(TRIPS_URL); const textTrips = await resTrips.text();
-            textTrips.trim().split("\n").slice(1).forEach(row => {
-                const r = row.split(","); if (r.length >= 8) tripsData.set(r[2]?.trim(), { route_id: r[0]?.trim(), service_id: r[1]?.trim(), trip_headsign: r[3]?.trim(), shape_id: r[7]?.trim() });
-            });
-            const resCalendar = await fetch(CALENDAR_URL); const textCalendar = await resCalendar.text();
-            textCalendar.trim().split("\n").slice(1).forEach(row => {
-                const r = row.split(","); if (r.length >= 10) calendarData.set(r[0].trim(), { monday: parseInt(r[1]), tuesday: parseInt(r[2]), wednesday: parseInt(r[3]), thursday: parseInt(r[4]), friday: parseInt(r[5]), saturday: parseInt(r[6]), sunday: parseInt(r[7]), start_date: r[8]?.trim(), end_date: r[9]?.trim() });
-            });
-            const resCalendarDates = await fetch(CALENDAR_DATES_URL); const textCalendarDates = await resCalendarDates.text();
-            textCalendarDates.trim().split("\n").slice(1).forEach(row => {
-                const r = row.split(","); if (r.length >= 3) {
-                    const service_id = r[0].trim(); if (!calendarDatesData.has(service_id)) calendarDatesData.set(service_id, new Map());
-                    calendarDatesData.get(service_id).set(r[1].trim(), parseInt(r[2]));
+                const r = row.split(","); 
+                if (r[0] && r.length >= 6) {
+                    // LA LÍNEA CRÍTICA CORREGIDA:
+                    stopsData.set(r[0].trim(), { stop_name: r[2]?.trim(), stop_lat: parseFloat(r[4]), stop_lon: parseFloat(r[5]) });
                 }
             });
+            const stopTimesTexts = await Promise.all([fetch(STOP_TIMES1_URL).then(res => res.text()), fetch(STOP_TIMES2_URL).then(res => res.text()), fetch(STOP_TIMES3_URL).then(res => res.text())]);
+            stopTimesTexts.forEach(text => { text.trim().split("\n").slice(1).forEach(row => { const r = row.split(","); if (r.length >= 5) stopTimesData.push({ trip_id: r[0]?.trim(), arrival_time: r[1]?.trim(), departure_time: r[2]?.trim(), stop_id: r[3]?.trim(), stop_sequence: parseInt(r[4]) }); }); });
+            const resTrips = await fetch(TRIPS_URL); const textTrips = await resTrips.text();
+            textTrips.trim().split("\n").slice(1).forEach(row => { const r = row.split(","); if (r.length >= 8) tripsData.set(r[2]?.trim(), { route_id: r[0]?.trim(), service_id: r[1]?.trim(), trip_headsign: r[3]?.trim(), shape_id: r[7]?.trim() }); });
+            const resCalendar = await fetch(CALENDAR_URL); const textCalendar = await resCalendar.text();
+            textCalendar.trim().split("\n").slice(1).forEach(row => { const r = row.split(","); if (r.length >= 10) calendarData.set(r[0].trim(), { monday: parseInt(r[1]), tuesday: parseInt(r[2]), wednesday: parseInt(r[3]), thursday: parseInt(r[4]), friday: parseInt(r[5]), saturday: parseInt(r[6]), sunday: parseInt(r[7]), start_date: r[8]?.trim(), end_date: r[9]?.trim() }); });
+            const resCalendarDates = await fetch(CALENDAR_DATES_URL); const textCalendarDates = await resCalendarDates.text();
+            textCalendarDates.trim().split("\n").slice(1).forEach(row => { const r = row.split(","); if (r.length >= 3) { const service_id = r[0].trim(); if (!calendarDatesData.has(service_id)) calendarDatesData.set(service_id, new Map()); calendarDatesData.get(service_id).set(r[1].trim(), parseInt(r[2])); } });
             console.log("Carga de datos GTFS completada.");
         } catch (e) { console.error("Error cargando datos GTFS:", e); }
     }
     async function cargarBusInfo() {
         try {
             const res = await fetch(SHEET_TSV_URL); const tsv = await res.text();
-            tsv.trim().split("\n").slice(1).forEach(r => {
-                const fila = r.split("\t"); if (fila[0]) busInfoMap.set(fila[0].trim(), { matricula: fila[1]?.trim() || "—", modelo: fila[2]?.trim() || "—", fecha: fila[3]?.trim() || "—" });
-            });
+            tsv.trim().split("\n").slice(1).forEach(r => { const fila = r.split("\t"); if (fila[0]) busInfoMap.set(fila[0].trim(), { matricula: fila[1]?.trim() || "—", modelo: fila[2]?.trim() || "—", fecha: fila[3]?.trim() || "—" }); });
         } catch (e) { console.error("Error cargando busInfo:", e); }
     }
     window.onload = async () => {
