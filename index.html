@@ -915,7 +915,11 @@
         }
 
         if (currentBusDelayInSeconds === null || currentBusStopIdRealTime === null) {
-            await localizarBusEnTiempoReal(tripId, null);
+            async function localizarBusEnTiempoReal(busId, tripIdToLocate) {
+            debugger; // <-- AÑADE ESTO AQUÍ
+            console.log("DEBUG: Entrando en localizarBusEnTiempoReal");
+            console.log("DEBUG: busId recibido:", busId);
+            console.log("DEBUG: tripIdToLocate recibido:", tripIdToLocate);
             
             if (currentBusDelayInSeconds !== null || currentBusStopIdRealTime !== null) {
                 renderRouteStopList(tripId, stopsOnRoute); 
