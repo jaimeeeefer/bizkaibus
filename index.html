@@ -529,8 +529,45 @@
 
         const upcomingBuses = [];
         const stopTimesAtThisStop = stopTimesData.filter(st => st.stop_id === stopId);
-
+        // Filtrar para quedarnos con el trip válido más reciente por cada hora+parada
+        const grouped = new Map();
+        
         for (const st of stopTimesAtThisStop) {
+            const key = `${st.stop_id}_${st.departure_time}`;
+            const trip = tripsData.get(st.trip_id);
+            if (!trip) continue;
+        
+            const service = calendarData.get(trip.service_id);
+            if (!service) continue;
+        
+            const start = parseInt(service.start_date);
+            const end = parseInt(service.end_date);
+            const current = parseInt(currentDate);
+            if (current < start || current > end) continue;
+        
+            const exceptions = calendarDatesData.get(trip.service_id);
+            const exception = exceptions?.get(currentDate);
+        
+            let activo = false;
+            if (exception === 1) activo = true;
+            else if (exception === 2) activo = false;
+            else {
+                const dias = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+                const hoy = dias[currentDayOfWeek];
+                activo = service[hoy] === 1;
+            }
+        
+            if (!activo) continue;
+        
+            if (!grouped.has(key) || trip.service_id > grouped.get(key).trip.service_id) {
+                grouped.set(key, { st, trip });
+            }
+        }
+        
+        const stopTimesValidos = Array.from(grouped.values()).map(e => e.st);
+
+      
+        for (const st of stopTimesValidos) {
             const trip = tripsData.get(st.trip_id);
             if (!trip) continue;
 
