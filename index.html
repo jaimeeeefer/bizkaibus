@@ -529,45 +529,8 @@
 
         const upcomingBuses = [];
         const stopTimesAtThisStop = stopTimesData.filter(st => st.stop_id === stopId);
-        // Filtrar para quedarnos con el trip válido más reciente por cada hora+parada
-        const grouped = new Map();
-        
-        for (const st of stopTimesAtThisStop) {
-            const key = `${st.stop_id}_${st.departure_time}`;
-            const trip = tripsData.get(st.trip_id);
-            if (!trip) continue;
-        
-            const service = calendarData.get(trip.service_id);
-            if (!service) continue;
-        
-            const start = parseInt(service.start_date);
-            const end = parseInt(service.end_date);
-            const current = parseInt(currentDate);
-            if (current < start || current > end) continue;
-        
-            const exceptions = calendarDatesData.get(trip.service_id);
-            const exception = exceptions?.get(currentDate);
-        
-            let activo = false;
-            if (exception === 1) activo = true;
-            else if (exception === 2) activo = false;
-            else {
-                const dias = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-                const hoy = dias[currentDayOfWeek];
-                activo = service[hoy] === 1;
-            }
-        
-            if (!activo) continue;
-        
-            if (!grouped.has(key) || trip.service_id > grouped.get(key).trip.service_id) {
-                grouped.set(key, { st, trip });
-            }
-        }
-        
-        const stopTimesValidos = Array.from(grouped.values()).map(e => e.st);
 
-      
-        for (const st of stopTimesValidos) {
+        for (const st of stopTimesAtThisStop) {
             const trip = tripsData.get(st.trip_id);
             if (!trip) continue;
 
@@ -695,39 +658,7 @@
             busListDiv.innerHTML = `<p>No hay próximos autobuses programados o en tiempo real para esta parada hoy (${currentTime.substring(0,5)}).</p>`;
         }
     }
-    function isTripActiveToday(serviceId, currentDate) {
-  const service = calendarData.get(serviceId);
-  if (!service) return false;
 
-  const startDate = parseInt(service.start_date);
-  const endDate = parseInt(service.end_date);
-  const current = parseInt(currentDate);
-
-  // Verificar si la fecha actual está dentro del rango de servicio
-  if (current < startDate || current > endDate) return false;
-
-  const exceptions = calendarDatesData.get(serviceId);
-  const exception = exceptions?.get(currentDate);
-
-  if (exception === 1) return true; // Servicio agregado para esta fecha
-  if (exception === 2) return false; // Servicio eliminado para esta fecha
-
-  // Si no hay excepciones, verificar el día de la semana
-  const dayOfWeek = new Date(
-    currentDate.substring(0, 4),
-    parseInt(currentDate.substring(4, 6)) - 1,
-    currentDate.substring(6, 8)
-  ).getDay(); // 0 (domingo) a 6 (sábado)
-
-  const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-  return service[days[dayOfWeek]] === 1;
-}
-    const stopTimesValidos = stopTimesAtThisStop.filter(st => {
-  const trip = tripsData.get(st.trip_id);
-  if (!trip) return false;
-
-  return isTripActiveToday(trip.service_id, currentDate);
-});
     async function localizarBusEnTiempoReal(targetTripId = null, targetVehicleRef = null) {
         let localBusDelayInSeconds = null;
         let localBusStopIdRealTime = null;
