@@ -736,37 +736,58 @@
                         currentBusLon = lon;
                         foundTripIdForBus = jref; 
 
+                        // --- INICIO DE LA MODIFICACIÓN ---
                         if (recordedAtTimeISO && spRef && jref) {
-                            const tripStopTimes = stopTimesData.filter(st => st.trip_id === jref && st.stop_id === spRef);
-                            if (tripStopTimes.length > 0) {
-                                const scheduledArrivalTimeStr = tripStopTimes[0].arrival_time; 
-                                const scheduledArrivalSeconds = timeToSeconds(scheduledArrivalTimeStr);
-                                
-                                const realTimeDate = new Date(recordedAtTimeISO);
-                                const realTimeStr = `${realTimeDate.getHours().toString().padStart(2, '0')}:${realTimeDate.getMinutes().toString().padStart(2, '0')}:${realTimeDate.getSeconds().toString().padStart(2, '0')}`;
-                                const realTimeSeconds = timeToSeconds(realTimeStr);
+                            const allStopsForTrip = stopTimesData
+                                .filter(st => st.trip_id === jref)
+                                .sort((a, b) => a.stop_sequence - b.stop_sequence);
 
-                                if (scheduledArrivalSeconds > 0 && realTimeSeconds > 0) {
-                                    localBusDelayInSeconds = realTimeSeconds - scheduledArrivalSeconds; 
-                                    
-                                    const delayInfoEl = document.getElementById('delay-info');
-                                    if (localBusDelayInSeconds > 60) {
-                                        delayInfoEl.textContent = `Retraso estimado: ${Math.round(localBusDelayInSeconds / 60)} minutos.`;
-                                        delayInfoEl.style.color = 'red';
-                                    } else if (localBusDelayInSeconds < -60) {
-                                        delayInfoEl.textContent = `Adelanto estimado: ${Math.round(Math.abs(localBusDelayInSeconds) / 60)} minutos.`;
-                                        delayInfoEl.style.color = 'green';
-                                    } else if (localBusDelayInSeconds !== 0 && Math.abs(localBusDelayInSeconds) > 15) { 
-                                        delayInfoEl.textContent = `En hora (aprox. ${localBusDelayInSeconds}s ${localBusDelayInSeconds > 0 ? 'tarde' : 'pronto'}).`;
-                                        delayInfoEl.style.color = 'orange';
-                                    } else {
-                                        delayInfoEl.textContent = "En hora (según última actualización).";
-                                        delayInfoEl.style.color = 'green';
+                            if (allStopsForTrip.length > 0) {
+                                const firstStopDepartureSeconds = timeToSeconds(allStopsForTrip[0].departure_time);
+                                const now = new Date();
+                                const currentTimeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+                                const currentSeconds = timeToSeconds(currentTimeStr);
+                                const delayInfoEl = document.getElementById('delay-info');
+
+                                // Comprobamos si la hora actual es anterior a la salida de la primera parada.
+                                if (currentSeconds < firstStopDepartureSeconds) {
+                                    localBusDelayInSeconds = 0; // Se considera en hora.
+                                    delayInfoEl.textContent = "En hora (esperando salida de cabecera).";
+                                    delayInfoEl.style.color = '#f0ad4e'; // Naranja (color "on-time").
+                                } else {
+                                    // Si el bus ya debería haber salido, calculamos el retraso/adelanto real.
+                                    const tripStopTimes = allStopsForTrip.filter(st => st.stop_id === spRef);
+                                    if (tripStopTimes.length > 0) {
+                                        const scheduledArrivalTimeStr = tripStopTimes[0].arrival_time;
+                                        const scheduledArrivalSeconds = timeToSeconds(scheduledArrivalTimeStr);
+                                        
+                                        const realTimeDate = new Date(recordedAtTimeISO);
+                                        const realTimeStr = `${realTimeDate.getHours().toString().padStart(2, '0')}:${realTimeDate.getMinutes().toString().padStart(2, '0')}:${realTimeDate.getSeconds().toString().padStart(2, '0')}`;
+                                        const realTimeSeconds = timeToSeconds(realTimeStr);
+
+                                        if (scheduledArrivalSeconds > 0 && realTimeSeconds > 0) {
+                                            localBusDelayInSeconds = realTimeSeconds - scheduledArrivalSeconds;
+                                            
+                                            if (localBusDelayInSeconds > 60) {
+                                                delayInfoEl.textContent = `Retraso estimado: ${Math.round(localBusDelayInSeconds / 60)} minutos.`;
+                                                delayInfoEl.style.color = 'red';
+                                            } else if (localBusDelayInSeconds < -60) {
+                                                delayInfoEl.textContent = `Adelanto estimado: ${Math.round(Math.abs(localBusDelayInSeconds) / 60)} minutos.`;
+                                                delayInfoEl.style.color = 'green';
+                                            } else if (localBusDelayInSeconds !== 0 && Math.abs(localBusDelayInSeconds) > 15) {
+                                                delayInfoEl.textContent = `En hora (aprox. ${localBusDelayInSeconds}s ${localBusDelayInSeconds > 0 ? 'tarde' : 'pronto'}).`;
+                                                delayInfoEl.style.color = 'orange';
+                                            } else {
+                                                delayInfoEl.textContent = "En hora (según última actualización).";
+                                                delayInfoEl.style.color = 'green';
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
-                        break; 
+                        // --- FIN DE LA MODIFICACIÓN ---
+                        break;
                     }
                 }
             }
