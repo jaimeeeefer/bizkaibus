@@ -578,6 +578,18 @@
                     case 6: runsToday = service.saturday === 1; break;
                 }
             }
+
+            // --- INICIO DEL CÓDIGO A AÑADIR ---
+            console.log(`Viaje potencial encontrado (antes de filtrar por fecha):`, {
+                trip_id: st.trip_id,
+                linea: trip.route_id,
+                destino: trip.trip_headsign,
+                hora_programada: st.departure_time,
+                service_id: trip.service_id,
+                // Este valor te dirá si el filtro posterior lo descartará o no
+                funciona_hoy: runsToday 
+            });
+            // --- FIN DEL CÓDIGO A AÑADIR ---
             
             if (!runsToday) continue;
 
