@@ -581,6 +581,16 @@
             
             if (!runsToday) continue;
 
+            // --- INICIO DEL CÓDIGO A AÑADIR ---
+            console.log(`Viaje encontrado y activo para hoy:`, {
+                linea: trip.route_id,
+                destino: trip.trip_headsign,
+                trip_id: st.trip_id,
+                hora_programada: st.departure_time,
+                service_id: trip.service_id
+            });
+            // --- FIN DEL CÓDIGO A AÑADIR ---
+
             let estimatedDepartureSeconds = timeToSeconds(st.departure_time);
             let delayStatusText = "";
             let isBusOnTime = false;
