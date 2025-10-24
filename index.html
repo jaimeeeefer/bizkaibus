@@ -218,12 +218,23 @@
 
     const COLORS = ['#FF0000', '#0000FF', '#008000', '#FFA500', '#800080', '#00FFFF', '#FF00FF', '#808080'];
 
+    // 1. Ícono de Bus (rojo) - Usando bus-marker.png (100x164)
     const busIcon = L.icon({
-        iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+        iconUrl: './img/bus-marker.png', // URL de tu archivo en la carpeta img
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-        popupAnchor: [1, -34],
+        iconSize: [100, 164],       // Dimensiones de tu imagen
+        iconAnchor: [50, 164],      // Punto de "anclaje" inferior
+        popupAnchor: [0, -150],     // Coloca el popup justo encima del pin
+        shadowSize: [41, 41]
+    });
+
+    // 2. Ícono de Parada (azul) - Usando stop-marker.png (100x164)
+    const stopIcon = L.icon({
+        iconUrl: './img/stop-marker.png', // URL de tu archivo en la carpeta img
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [100, 164],
+        iconAnchor: [50, 164],
+        popupAnchor: [0, -150],
         shadowSize: [41, 41]
     });
 
