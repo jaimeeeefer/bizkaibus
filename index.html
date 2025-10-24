@@ -232,7 +232,7 @@
         console.log("Enviando solicitud de calentamiento al servidor...");
         // Hacemos la petición pero no necesitamos usar la respuesta.
         // Su único propósito es "despertar" al servicio.
-        await fetch("https://bizkaibus.onrender.com/bizkaibus");
+        await fetch("/bizkaibus");
         console.log("Servidor contactado con éxito. Debería estar listo.");
       } catch (error) {
         // Si falla, solo lo mostramos en la consola para no molestar al usuario.
