@@ -463,9 +463,9 @@
 
           const marcador = L.marker([lat, lon]).addTo(map);
           marcador.bindPopup(`
-            <b>Línea:</b> ${lineaLimpia}<br>
-            <b>Parada actual/sig.:</b> ${paradaTexto} ${sp ? '('+sp+')' : ''}<br>
-            <b>Bus:</b> ${vref}<br>
+            <b>Línea:</b> <a href="#" onclick="rellenarYBuscarLinea('${lineaLimpia}'); return false;">${lineaLimpia}</a><br>
+            <b>Parada actual/sig.:</b> <a href="#" onclick="rellenarYBuscarParada('${sp}'); return false;">${paradaTexto} ${sp ? '('+sp+')' : ''}</a><br>
+            <b>Bus Nº:</b> <a href="#" onclick="rellenarYBuscarBus('${vref}'); return false;">${vref}</a><br>
             <b>Matrícula:</b> ${infoBus.matricula}<br>
             <b>Modelo:</b> ${infoBus.modelo}<br>
             <b>Fecha matriculación:</b> ${infoBus.fecha}
@@ -486,19 +486,6 @@
         console.error("Error en buscarBusesPorLinea:", e);
         alert("Error al descargar o procesar datos de Bizkaibus.");
       }
-    }
-
-    function rellenarYMostrarRecorrido(lineaId, paradaId, tripId, shapeId) {
-        // 1. Rellena los campos de texto
-        document.getElementById("linea").value = lineaId;
-        document.getElementById("parada").value = paradaId;
-        document.getElementById("numBus").value = ""; // Limpia el campo del bus individual
-
-        // 2. Ejecuta la lógica para mostrar el recorrido
-        mostrarRecorrido(tripId, shapeId);
-
-        // Opcional: Centrar la vista en la información
-        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     async function buscarBusesPorParada() {
@@ -536,7 +523,7 @@
             const rtResp = await fetch("/bizkaibus");
             const rtXmlText = await rtResp.text();
             const rtXml = new DOMParser().parseFromString(rtXmlText, "application/xml");
-            const rtActivityElements = rtXml.getElementsByTagName("VehicleActivity");
+            const rtActivityElements = Array.from(rtXml.getElementsByTagName("VehicleActivity"));
 
             for (let act of rtActivityElements) {
                 const jref = act.querySelector("VehicleJourneyRef")?.textContent.trim();
@@ -670,11 +657,13 @@
                 }
 
 
-                busOption.innerHTML = `<span class="bus-option-linea">Línea: ${bus.linea}</span><span class="bus-option-hora">${bus.hora}${delayStatusText}</span><span class="bus-option-destino">Destino: ${bus.destino}</span>`;
-            
-                // Llama a una nueva función que hará el relleno Y la búsqueda del recorrido
-                busOption.onclick = () => { 
-                    rellenarYMostrarRecorrido(bus.linea, stopId, bus.trip_id, bus.shape_id); 
+                busOption.innerHTML = `
+                    <span class="bus-option-linea">Línea: ${bus.linea}</span>
+                    <span class="bus-option-hora">${timeDisplay}</span>
+                    <span class="bus-option-destino">Destino: ${bus.destino}</span>
+                `;
+                busOption.onclick = () => {
+                    mostrarRecorrido(bus.trip_id, bus.shape_id); 
                 };
                 busListDiv.appendChild(busOption);
             });
@@ -734,10 +723,10 @@
                         realTimeBusMarker = L.marker([lat, lon], { icon: busIcon }).addTo(map);
                         realTimeBusMarker.bindPopup(`
                             <b>¡Autobús en tiempo real!</b><br>
-                            <b>Línea:</b> ${lineaDisplay}<br>
+                            <b>Línea:</b> <a href="#" onclick="rellenarYBuscarLinea('${lineaDisplay}'); return false;">${lineaDisplay}</a><br>
                             <b>Destino:</b> ${destinoDisplay}<br>
-                            <b>Parada actual/sig:</b> ${paradaActualNombre} ${spRef ? '('+spRef+')' : ''}<br>
-                            <b>Bus Nº:</b> ${vref}<br>
+                            <b>Parada actual/sig:</b> <a href="#" onclick="rellenarYBuscarParada('${spRef}'); return false;">${paradaActualNombre} ${spRef ? '('+spRef+')' : ''}</a><br>
+                            <b>Bus Nº:</b> <a href="#" onclick="rellenarYBuscarBus('${vref}'); return false;">${vref}</a><br>
                             <b>Matrícula:</b> ${infoBus.matricula}<br>
                             <b>Modelo:</b> ${infoBus.modelo}<br>
                         `).openPopup();
@@ -978,6 +967,48 @@
         } else if (realTimeBusMarker) {
             map.setView(realTimeBusMarker.getLatLng(), 15);
         }
+    }
+
+    function rellenarYBuscarLinea(lineaId) {
+        // 1. Rellena el campo de Línea y limpia los otros
+        document.getElementById("linea").value = lineaId;
+        document.getElementById("parada").value = "";
+        document.getElementById("numBus").value = "";
+
+        // 2. Ejecuta la función de búsqueda de línea
+        buscarBusesPorLinea(); 
+        
+        // Opcional: Desplazarse a la parte superior
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function rellenarYBuscarParada(paradaId) {
+        // Si no hay ID de parada, no hacemos nada (ej: si spRef es null)
+        if (!paradaId) return;
+
+        // 1. Rellena el campo de Parada y limpia los otros
+        document.getElementById("parada").value = paradaId;
+        document.getElementById("linea").value = "";
+        document.getElementById("numBus").value = "";
+        
+        // 2. Ejecuta la función de búsqueda de parada
+        buscarBusesPorParada(); 
+        
+        // Opcional: Desplazarse a la parte superior
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function rellenarYBuscarBus(busNumero) {
+        // 1. Rellena el campo de Número de Bus y limpia los otros
+        document.getElementById("numBus").value = busNumero;
+        document.getElementById("linea").value = "";
+        document.getElementById("parada").value = "";
+
+        // 2. Ejecuta la función de búsqueda de bus
+        buscarBusPorNumero(); 
+        
+        // Opcional: Desplazarse a la parte superior
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     window.onload = async () => {
