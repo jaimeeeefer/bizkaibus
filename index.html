@@ -433,7 +433,7 @@
       document.getElementById('route-details').style.display = 'none';
 
       try {
-        const resp = await fetch("https://bizkaibus.onrender.com/bizkaibus");
+        const resp = await fetch("/bizkaibus");
         const xmlText = await resp.text();
         const xml = new DOMParser().parseFromString(xmlText, "application/xml");
         const actividades = xml.getElementsByTagName("VehicleActivity");
@@ -520,7 +520,7 @@
 
         const realTimeActivities = new Map();
         try {
-            const rtResp = await fetch("https://bizkaibus.onrender.com/bizkaibus");
+            const rtResp = await fetch("/bizkaibus");
             const rtXmlText = await rtResp.text();
             const rtXml = new DOMParser().parseFromString(rtXmlText, "application/xml");
             const rtActivityElements = rtXml.getElementsByTagName("VehicleActivity");
@@ -686,7 +686,7 @@
         }
 
         try {
-            const resp = await fetch("https://bizkaibus.onrender.com/bizkaibus");
+            const resp = await fetch("/bizkaibus");
             const xmlText = await resp.text();
             const xml = new DOMParser().parseFromString(xmlText, "application/xml");
             const actividades = xml.getElementsByTagName("VehicleActivity");
