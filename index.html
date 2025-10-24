@@ -488,6 +488,19 @@
       }
     }
 
+    function rellenarYMostrarRecorrido(lineaId, paradaId, tripId, shapeId) {
+        // 1. Rellena los campos de texto
+        document.getElementById("linea").value = lineaId;
+        document.getElementById("parada").value = paradaId;
+        document.getElementById("numBus").value = ""; // Limpia el campo del bus individual
+
+        // 2. Ejecuta la lógica para mostrar el recorrido
+        mostrarRecorrido(tripId, shapeId);
+
+        // Opcional: Centrar la vista en la información
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
     async function buscarBusesPorParada() {
         const stopIdInput = document.getElementById("parada").value.trim();
         if (!stopIdInput) {
@@ -657,13 +670,11 @@
                 }
 
 
-                busOption.innerHTML = `
-                    <span class="bus-option-linea">Línea: ${bus.linea}</span>
-                    <span class="bus-option-hora">${timeDisplay}</span>
-                    <span class="bus-option-destino">Destino: ${bus.destino}</span>
-                `;
-                busOption.onclick = () => {
-                    mostrarRecorrido(bus.trip_id, bus.shape_id); 
+                busOption.innerHTML = `<span class="bus-option-linea">Línea: ${bus.linea}</span><span class="bus-option-hora">${bus.hora}${delayStatusText}</span><span class="bus-option-destino">Destino: ${bus.destino}</span>`;
+            
+                // Llama a una nueva función que hará el relleno Y la búsqueda del recorrido
+                busOption.onclick = () => { 
+                    rellenarYMostrarRecorrido(bus.linea, stopId, bus.trip_id, bus.shape_id); 
                 };
                 busListDiv.appendChild(busOption);
             });
