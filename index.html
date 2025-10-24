@@ -649,7 +649,7 @@
             const stopInfo = stopsData.get(stopId);
             if (stopInfo) { 
                 const paradaTexto = getCleanStopName(stopId);
-                const stopMarker = L.marker([stopInfo.stop_lat, stopInfo.stop_lon]).addTo(map);
+                const stopMarker = L.marker([stopInfo.stop_lat, stopInfo.stop_lon], { icon: stopIcon }).addTo(map);
                 stopMarker.bindPopup(`<b>Parada:</b> ${paradaTexto} (${stopId})`).openPopup();
                 stopMarkers.push(stopMarker); 
                 map.setView([stopInfo.stop_lat, stopInfo.stop_lon], 15);
@@ -938,7 +938,7 @@
         stopsOnRoute.forEach(st => {
             const stopInfo = stopsData.get(st.stop_id);
             if (stopInfo) {
-                 const marker = L.marker([stopInfo.stop_lat, stopInfo.stop_lon]).addTo(map);
+                 const marker = L.marker([stopInfo.stop_lat, stopInfo.stop_lon], { icon: stopIcon }).addTo(map);
                  marker.bindPopup(`
                     <b>Parada:</b> ${getCleanStopName(st.stop_id)}<br>
                     <b>ID:</b> ${st.stop_id}<br>
