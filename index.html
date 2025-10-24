@@ -218,23 +218,23 @@
 
     const COLORS = ['#FF0000', '#0000FF', '#008000', '#FFA500', '#800080', '#00FFFF', '#FF00FF', '#808080'];
 
-    // 1. Ícono de Bus (rojo) - Usando bus-marker.png (100x164)
+    // 1. Ícono de Bus (rojo) - Usando bus-marker.png (escalado)
     const busIcon = L.icon({
-        iconUrl: './img/bus-marker.png', // URL de tu archivo en la carpeta img
+        iconUrl: './img/bus-marker.png', // Tu imagen subida
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-        iconSize: [100, 164],       // Dimensiones de tu imagen
-        iconAnchor: [50, 164],      // Punto de "anclaje" inferior
-        popupAnchor: [0, -150],     // Coloca el popup justo encima del pin
+        iconSize: [32, 52],        // Nuevo tamaño escalado
+        iconAnchor: [16, 52],      // Punto de anclaje (mitad del ancho, altura total)
+        popupAnchor: [0, -45],     // Coloca el popup justo encima del pin
         shadowSize: [41, 41]
     });
 
-    // 2. Ícono de Parada (azul) - Usando stop-marker.png (100x164)
+    // 2. Ícono de Parada (azul) - Usando stop-marker.png (escalado)
     const stopIcon = L.icon({
-        iconUrl: './img/stop-marker.png', // URL de tu archivo en la carpeta img
+        iconUrl: './img/stop-marker.png', // Tu imagen subida
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-        iconSize: [100, 164],
-        iconAnchor: [50, 164],
-        popupAnchor: [0, -150],
+        iconSize: [32, 52],
+        iconAnchor: [16, 52],
+        popupAnchor: [0, -45],
         shadowSize: [41, 41]
     });
 
