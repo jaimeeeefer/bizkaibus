@@ -218,23 +218,23 @@
 
     const COLORS = ['#FF0000', '#0000FF', '#008000', '#FFA500', '#800080', '#00FFFF', '#FF00FF', '#808080'];
 
-    // 1. Ícono de Bus (rojo) - Usando bus-marker.png (escalado)
+    // 1. Ícono de Bus (rojo) - Usando bus-marker.png (escalado 28x46)
     const busIcon = L.icon({
-        iconUrl: './img/bus-marker.png', // Tu imagen subida
+        iconUrl: './img/bus-marker.png', 
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-        iconSize: [32, 52],        // Nuevo tamaño escalado
-        iconAnchor: [16, 52],      // Punto de anclaje (mitad del ancho, altura total)
-        popupAnchor: [0, -45],     // Coloca el popup justo encima del pin
+        iconSize: [28, 46],        // Tamaño final
+        iconAnchor: [14, 46],      // Punto de anclaje
+        popupAnchor: [0, -40],     // Posición del popup
         shadowSize: [41, 41]
     });
 
-    // 2. Ícono de Parada (azul) - Usando stop-marker.png (escalado)
+    // 2. Ícono de Parada (azul) - Usando stop-marker.png (escalado 28x46)
     const stopIcon = L.icon({
-        iconUrl: './img/stop-marker.png', // Tu imagen subida
+        iconUrl: './img/stop-marker.png', 
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-        iconSize: [32, 52],
-        iconAnchor: [16, 52],
-        popupAnchor: [0, -45],
+        iconSize: [28, 46],
+        iconAnchor: [14, 46],
+        popupAnchor: [0, -40],
         shadowSize: [41, 41]
     });
 
@@ -472,7 +472,7 @@
           const paradaTexto = sp ? getCleanStopName(sp) : "N/D";
           const infoBus = busInfoMap.get(vref) || { matricula: "—", modelo: "—", fecha: "—"};
 
-          const marcador = L.marker([lat, lon]).addTo(map);
+          const marcador = L.marker([lat, lon], { icon: busIcon }).addTo(map);
           marcador.bindPopup(`
             <b>Línea:</b> <a href="#" onclick="rellenarYBuscarLinea('${lineaLimpia}'); return false;">${lineaLimpia}</a><br>
             <b>Parada actual/sig.:</b> <a href="#" onclick="rellenarYBuscarParada('${sp}'); return false;">${paradaTexto} ${sp ? '('+sp+')' : ''}</a><br>
