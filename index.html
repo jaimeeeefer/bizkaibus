@@ -694,30 +694,60 @@
     }
 
     async function buscarBusPorNumero() {
+        // Asegurarse de que las variables globales se reseteen
+        clearMapElements(); 
+        clearLineSearchMarkers();
+
         const numBus = document.getElementById("numBus").value.trim();
+        
+        // 1. Validar la entrada
         if (!numBus) {
-            alert("Introduce un número de bus válido.");
+            alert("Por favor, introduce un número de bus.");
             return;
         }
 
-        clearMapElements(); 
-        clearLineSearchMarkers();
+        // Mostrar mapa y limpiar resultados de parada/ruta
+        document.getElementById('map').style.display = 'block';
         document.getElementById('stop-results').style.display = 'none';
-        document.getElementById('route-details').style.display = 'none'; 
+        document.getElementById('route-details').style.display = 'none';
 
-        const foundTripId = await localizarBusEnTiempoReal(null, numBus);
+        try {
+            // 2. Obtener y parsear datos en tiempo real (Proxy)
+            const rtResp = await fetch("https://bizkaibus.pages.dev/bizkaibus");
+            if (!rtResp.ok) throw new Error("No se pudo obtener datos en tiempo real del proxy.");
 
-        if (foundTripId) {
-            const tripInfo = tripsData.get(foundTripId);
-            if (tripInfo) {
-                mostrarRecorrido(foundTripId, tripInfo.shape_id);
-            } else {
-                alert(`Se encontró el bus ${numBus} pero no se pudo cargar su recorrido completo (faltan datos del viaje).`);
-                document.getElementById('route-details').style.display = 'none';
+            const rtXmlText = await rtResp.text();
+            const parser = new DOMParser();
+            // Se asume que la función parseSIRI existe y funciona
+            const realTimeActivities = parseSIRI(parser.parseFromString(rtXmlText, "text/xml")); 
+
+            // 3. Buscar el bus por su VehicleRef
+            let foundTripId = null;
+            // CLAVE: Convertimos la entrada a String para asegurar que la comparación sea correcta
+            const targetVehicleRef = String(numBus); 
+
+            for (const [tripId, busData] of realTimeActivities.entries()) {
+                // Comparamos el VehicleRef (que debe ser un String)
+                if (busData.vehicleRef === targetVehicleRef) {
+                    foundTripId = tripId;
+                    break;
+                }
             }
-        } else {
-            document.getElementById('route-details').style.display = 'none'; 
-            alert(`El autobús nº ${numBus} no se encuentra disponible en tiempo real o no existe.`);
+
+            // 4. Actuar según el resultado de la búsqueda
+            if (foundTripId) {
+                // Bus encontrado: iniciar la localización y el renderizado de la ruta
+                await localizarBusEnTiempoReal(foundTripId);
+            } else {
+                // Bus NO encontrado: limpiar y mostrar mensaje
+                clearMapElements(); 
+                alert(`No se encontró el autobús número ${numBus} en servicio.`);
+            }
+
+        } catch (error) {
+            console.error("Error en buscarBusPorNumero:", error);
+            clearMapElements();
+            alert("Ocurrió un error al buscar el autobús. Revisa la consola para más detalles.");
         }
     }
 
