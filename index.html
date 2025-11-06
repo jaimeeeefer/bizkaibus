@@ -890,47 +890,63 @@
 
     function parseSIRI(xmlDoc) {
         const realTimeActivities = new Map();
-        // 1. Buscar todas las actividades de vehículos
         const vehicleActivities = xmlDoc.getElementsByTagName('VehicleActivity');
 
         for (let i = 0; i < vehicleActivities.length; i++) {
             const activity = vehicleActivities[i];
-            
+
             const monitoredVehicleJourney = activity.getElementsByTagName('MonitoredVehicleJourney')[0];
             if (!monitoredVehicleJourney) continue;
-            
-            // 2. EXTRACCIÓN Y NORMALIZACIÓN DEL VehicleRef
-            const vehicleRefRaw = monitoredVehicleJourney.getElementsByTagName('VehicleRef')[0]?.textContent.trim();
-            // Clave: Normalizamos a solo dígitos (ej: '7817' queda como '7817')
-            const vehicleRef = vehicleRefRaw ? vehicleRefRaw.replace(/\D/g, '') : null; 
 
-            // 3. Extracción del TripId (Clave para unir con GTFS)
-            const journeyPatternRef = monitoredVehicleJourney.getElementsByTagName('JourneyPatternRef')[0]?.textContent.trim();
-            const journeyPatternRefParts = journeyPatternRef ? journeyPatternRef.split('_') : [];
-            const tripId = journeyPatternRefParts.length > 2 ? journeyPatternRefParts[2] : null;
+            // VehicleRef (normalmente dentro de MonitoredVehicleJourney)
+            const vehicleRef = monitoredVehicleJourney.getElementsByTagName('VehicleRef')[0]?.textContent.trim();
 
-            // 4. Extracción de Posición y Tiempo
+            // Intentos de obtener tripId (orden de preferencia)
+            let tripId = null;
+
+            // 1) JourneyPatternRef si existe y tu formato lo permite
+            const journeyPatternRef = monitoredVehicleJourney.getElementsByTagName('JourneyPatternRef')[0]?.textContent?.trim();
+            if (journeyPatternRef) {
+                const parts = journeyPatternRef.split('_');
+                if (parts.length > 2) tripId = parts[2];
+            }
+
+            // 2) VehicleJourneyRef (aparece en tus ejemplos)
+            if (!tripId) {
+                tripId = monitoredVehicleJourney.getElementsByTagName('VehicleJourneyRef')[0]?.textContent?.trim()
+                    || activity.getElementsByTagName('VehicleJourneyRef')[0]?.textContent?.trim();
+            }
+
+            // 3) fallback: usar VehicleRef si no hay otro identificador
+            if (!tripId && vehicleRef) {
+                tripId = vehicleRef;
+            }
+
+            // Posición y tiempo
             const vehicleLocation = monitoredVehicleJourney.getElementsByTagName('VehicleLocation')[0];
-            const latitude = vehicleLocation?.getElementsByTagName('Latitude')[0]?.textContent.trim();
-            const longitude = vehicleLocation?.getElementsByTagName('Longitude')[0]?.textContent.trim();
-            
-            const monitoredCall = monitoredVehicleJourney.getElementsByTagName('MonitoredCall')[0];
-            const stopPointRef = monitoredCall?.getElementsByTagName('StopPointRef')[0]?.textContent.trim();
-            const recordedAtTimeISO = activity.getElementsByTagName('RecordedAtTime')[0]?.textContent.trim();
+            const latitude = vehicleLocation?.getElementsByTagName('Latitude')[0]?.textContent?.trim();
+            const longitude = vehicleLocation?.getElementsByTagName('Longitude')[0]?.textContent?.trim();
 
-            // 5. Guardar en el Map si los datos son válidos
-            if (tripId && vehicleRef && latitude && longitude) {
+            // MonitoredCall / StopPointRef
+            const monitoredCall = monitoredVehicleJourney.getElementsByTagName('MonitoredCall')[0];
+            const stopPointRef = monitoredCall?.getElementsByTagName('StopPointRef')[0]?.textContent?.trim();
+
+            // RecordedAtTime puede estar en activity
+            const recordedAtTimeISO = activity.getElementsByTagName('RecordedAtTime')[0]?.textContent?.trim()
+                                || monitoredVehicleJourney.getElementsByTagName('RecordedAtTime')[0]?.textContent?.trim();
+
+            // Guardar solo si tenemos un tripId y coordenadas válidas
+            if (tripId && latitude && longitude) {
                 realTimeActivities.set(tripId, {
-                    vehicleRef: vehicleRef,
-                    lineRef: monitoredVehicleJourney.getElementsByTagName('LineRef')[0]?.textContent.trim(),
-                    latitude: latitude,
-                    longitude: longitude,
-                    stopPointRef: stopPointRef,
-                    recordedAtTimeISO: recordedAtTimeISO
+                    vehicleRef: vehicleRef || null,
+                    latitude: String(latitude),
+                    longitude: String(longitude),
+                    stopPointRef: stopPointRef || null,
+                    recordedAtTimeISO: recordedAtTimeISO || null
                 });
             }
         }
-        
+
         return realTimeActivities;
     }
 
