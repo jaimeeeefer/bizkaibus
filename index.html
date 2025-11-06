@@ -890,25 +890,26 @@
 
     function parseSIRI(xmlDoc) {
         const realTimeActivities = new Map();
+        // 1. Buscar todas las actividades de vehículos
         const vehicleActivities = xmlDoc.getElementsByTagName('VehicleActivity');
 
         for (let i = 0; i < vehicleActivities.length; i++) {
             const activity = vehicleActivities[i];
             
-            // 1. Datos de Referencia del Bus
             const monitoredVehicleJourney = activity.getElementsByTagName('MonitoredVehicleJourney')[0];
             if (!monitoredVehicleJourney) continue;
             
-            // 2. Extracción de Datos Clave
-            const vehicleRef = monitoredVehicleJourney.getElementsByTagName('VehicleRef')[0]?.textContent.trim();
-            const lineRef = monitoredVehicleJourney.getElementsByTagName('LineRef')[0]?.textContent.trim();
+            // 2. EXTRACCIÓN Y NORMALIZACIÓN DEL VehicleRef
+            const vehicleRefRaw = monitoredVehicleJourney.getElementsByTagName('VehicleRef')[0]?.textContent.trim();
+            // Clave: Normalizamos a solo dígitos (ej: '7817' queda como '7817')
+            const vehicleRef = vehicleRefRaw ? vehicleRefRaw.replace(/\D/g, '') : null; 
+
+            // 3. Extracción del TripId (Clave para unir con GTFS)
             const journeyPatternRef = monitoredVehicleJourney.getElementsByTagName('JourneyPatternRef')[0]?.textContent.trim();
             const journeyPatternRefParts = journeyPatternRef ? journeyPatternRef.split('_') : [];
-            
-            // El TripId es crucial para unir los datos GTFS (horarios) con la posición en tiempo real
             const tripId = journeyPatternRefParts.length > 2 ? journeyPatternRefParts[2] : null;
 
-            // 3. Datos de Posición y Tiempo
+            // 4. Extracción de Posición y Tiempo
             const vehicleLocation = monitoredVehicleJourney.getElementsByTagName('VehicleLocation')[0];
             const latitude = vehicleLocation?.getElementsByTagName('Latitude')[0]?.textContent.trim();
             const longitude = vehicleLocation?.getElementsByTagName('Longitude')[0]?.textContent.trim();
@@ -917,10 +918,11 @@
             const stopPointRef = monitoredCall?.getElementsByTagName('StopPointRef')[0]?.textContent.trim();
             const recordedAtTimeISO = activity.getElementsByTagName('RecordedAtTime')[0]?.textContent.trim();
 
-            if (tripId && latitude && longitude) {
+            // 5. Guardar en el Map si los datos son válidos
+            if (tripId && vehicleRef && latitude && longitude) {
                 realTimeActivities.set(tripId, {
                     vehicleRef: vehicleRef,
-                    lineRef: lineRef,
+                    lineRef: monitoredVehicleJourney.getElementsByTagName('LineRef')[0]?.textContent.trim(),
                     latitude: latitude,
                     longitude: longitude,
                     stopPointRef: stopPointRef,
