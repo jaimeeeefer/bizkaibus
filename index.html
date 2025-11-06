@@ -594,6 +594,8 @@
         currentBusDelayInSeconds = null;
         currentBusStopIdRealTime = null;
 
+        let mapElementsBounds = new L.LatLngBounds();
+
         // 1. Obtener y parsear datos en tiempo real (FRESH FETCH)
         const rtResp = await fetch("https://bizkaibus.pages.dev/bizkaibus");
         const rtXmlText = await rtResp.text();
