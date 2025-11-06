@@ -112,7 +112,7 @@
     async function calentarServidor() {
       try {
         console.log("Enviando solicitud de calentamiento al servidor...");
-        await fetch("https://bizkaibus.pages.dev/bizkaibus");
+        await fetch("/bizkaibus");
         console.log("Servidor contactado con éxito. Debería estar listo.");
       } catch (error) {
         console.warn("La solicitud de calentamiento falló. La primera búsqueda podría ser lenta:", error);
@@ -312,7 +312,7 @@
       document.getElementById('route-details').style.display = 'none';
 
       try {
-        await fetch("https://bizkaibus.pages.dev/bizkaibus");
+        const resp = await fetch("/bizkaibus");
         const xmlText = await resp.text();
         const xml = new DOMParser().parseFromString(xmlText, "application/xml");
         const actividades = xml.getElementsByTagName("VehicleActivity");
@@ -401,7 +401,7 @@
 
         const realTimeActivities = new Map();
         try {
-            await fetch("https://bizkaibus.pages.dev/bizkaibus");
+            const rtResp = await fetch("/bizkaibus");
             const rtXmlText = await rtResp.text();
             const rtXml = new DOMParser().parseFromString(rtXmlText, "application/xml");
             const rtActivityElements = Array.from(rtXml.getElementsByTagName("VehicleActivity"));
@@ -585,7 +585,7 @@
         }
 
         try {
-            await fetch("https://bizkaibus.pages.dev/bizkaibus");
+            const resp = await fetch("/bizkaibus");
             const xmlText = await resp.text();
             const xml = new DOMParser().parseFromString(xmlText, "application/xml");
             const actividades = xml.getElementsByTagName("VehicleActivity");
