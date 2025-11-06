@@ -1,39 +1,26 @@
-// Contenido para: functions/bizkaibus.js - VERSIÓN FINAL Y COMPLETA
+// Contenido para: functions/bizkaibus.js
+
 export async function onRequestGet(context) {
+  // La URL del XML original
   const xmlUrl = 'https://ctb-siri.s3.eu-south-2.amazonaws.com/bizkaibus-vehicle-positions.xml';
 
   try {
+    // Creamos la petición al origen
     const proxyRequest = new Request(xmlUrl, {
       headers: { 'User-Agent': 'Mozilla/5.0' }
     });
 
+    // Hacemos el fetch
     const originResponse = await fetch(proxyRequest);
 
     if (!originResponse.ok) {
       return new Response(`Error al contactar el S3: ${originResponse.statusText}`, { status: originResponse.status });
     }
-    
-    // 1. Leer el cuerpo como texto (el Worker lo descomprime automáticamente)
-    const bodyText = await originResponse.text();
 
-    // 2. Crear un nuevo objeto de encabezados, copiando los originales
-    const headers = new Headers(originResponse.headers);
-    
-    // 3. ✨ CORRECCIÓN CLAVE: Eliminar el encabezado Content-Encoding.
-    // Esto es crucial porque el cuerpo ya está descomprimido al usar .text().
-    if (headers.has('Content-Encoding')) {
-        headers.delete('Content-Encoding');
-    }
-    
-    // 4. CORRECCIÓN CORS: Añadir el encabezado CORS
-    headers.set('Access-Control-Allow-Origin', '*');
-    headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS'); 
-    
-    // 5. Devolver una nueva respuesta con el cuerpo descomprimido y los encabezados corregidos
-    return new Response(bodyText, {
-        status: originResponse.status,
-        headers: headers
-    });
+    // Retornamos una nueva respuesta clonando la original.
+    // Esto copia el body, status, y las cabeceras (como Content-Type).
+    // ¡No necesitamos cabeceras CORS porque se sirve desde el mismo dominio!
+    return new Response(originResponse.body, originResponse);
 
   } catch (err) {
     return new Response(`Error en la Función: ${err.message}`, { status: 500 });
