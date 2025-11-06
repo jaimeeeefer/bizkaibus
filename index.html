@@ -694,62 +694,59 @@
     }
 
     async function buscarBusPorNumero() {
+        // Asegurarse de que las variables globales se reseteen
+        clearMapElements(); 
+        clearLineSearchMarkers();
+
         const numBus = document.getElementById("numBus").value.trim();
+        
+        // 1. Validar la entrada
         if (!numBus) {
-            alert("Introduce un número de bus válido.");
+            alert("Por favor, introduce un número de bus.");
             return;
         }
 
-        // Limpieza de estado anterior
-        clearMapElements();
-        clearLineSearchMarkers();
+        // Mostrar mapa y limpiar resultados de parada/ruta
+        document.getElementById('map').style.display = 'block';
         document.getElementById('stop-results').style.display = 'none';
         document.getElementById('route-details').style.display = 'none';
 
         try {
-            // 1️⃣ Obtener datos SIRI en XML
-            const resp = await fetch("https://bizkaibus.pages.dev/bizkaibus");
-            if (!resp.ok) throw new Error("No se pudo obtener datos en tiempo real del proxy Bizkaibus.");
+            // 2. Obtener y parsear datos en tiempo real (Proxy)
+            const rtResp = await fetch("https://bizkaibus.pages.dev/bizkaibus");
+            if (!rtResp.ok) throw new Error("No se pudo obtener datos en tiempo real del proxy.");
 
-            const xmlText = await resp.text();
-            const xml = new DOMParser().parseFromString(xmlText, "application/xml");
-            const actividades = Array.from(xml.getElementsByTagName("VehicleActivity"));
+            const rtXmlText = await rtResp.text();
+            const parser = new DOMParser();
+            // Se asume que la función parseSIRI existe y funciona
+            const realTimeActivities = parseSIRI(parser.parseFromString(rtXmlText, "text/xml")); 
 
-            // 2️⃣ Buscar el bus concreto
+            // 3. Buscar el bus por su VehicleRef
             let foundTripId = null;
-            let busLat = null;
-            let busLon = null;
+            // CLAVE: Convertimos la entrada a String para asegurar que la comparación sea correcta
+            const targetVehicleRef = String(numBus); 
 
-            for (let act of actividades) {
-                const vref = act.querySelector("VehicleRef")?.textContent.trim();
-                if (vref === numBus) {
-                    foundTripId = act.querySelector("VehicleJourneyRef")?.textContent.trim();
-                    busLat = parseFloat(act.querySelector("Latitude")?.textContent);
-                    busLon = parseFloat(act.querySelector("Longitude")?.textContent);
+            for (const [tripId, busData] of realTimeActivities.entries()) {
+                // Comparamos el VehicleRef (que debe ser un String)
+                if (busData.vehicleRef === targetVehicleRef) {
+                    foundTripId = tripId;
                     break;
                 }
             }
 
-            // 3️⃣ Mostrar el resultado
-            if (foundTripId && !isNaN(busLat) && !isNaN(busLon)) {
-                // Dibujar marcador del bus
-                realTimeBusMarker = L.marker([busLat, busLon], { icon: busIcon }).addTo(map);
-                realTimeBusMarker.bindPopup(`Autobús Nº ${numBus}`).openPopup();
-                map.setView([busLat, busLon], 15);
-
-                // Intentar mostrar recorrido si existen datos GTFS
-                const tripInfo = tripsData.get(foundTripId);
-                if (tripInfo) {
-                    mostrarRecorrido(foundTripId, tripInfo.shape_id);
-                } else {
-                    alert(`Se encontró el bus ${numBus} en tiempo real, pero no hay información completa del viaje.`);
-                }
+            // 4. Actuar según el resultado de la búsqueda
+            if (foundTripId) {
+                // Bus encontrado: iniciar la localización y el renderizado de la ruta
+                await localizarBusEnTiempoReal(foundTripId);
             } else {
-                alert(`El autobús nº ${numBus} no se encuentra disponible en tiempo real o no existe.`);
+                // Bus NO encontrado: limpiar y mostrar mensaje
+                clearMapElements(); 
+                alert(`No se encontró el autobús número ${numBus} en servicio.`);
             }
 
         } catch (error) {
             console.error("Error en buscarBusPorNumero:", error);
+            clearMapElements();
             alert("Ocurrió un error al buscar el autobús. Revisa la consola para más detalles.");
         }
     }
@@ -889,6 +886,50 @@
         document.getElementById("parada").value = "";
         buscarBusPorNumero(); 
         window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function parseSIRI(xmlDoc) {
+        const realTimeActivities = new Map();
+        const vehicleActivities = xmlDoc.getElementsByTagName('VehicleActivity');
+
+        for (let i = 0; i < vehicleActivities.length; i++) {
+            const activity = vehicleActivities[i];
+            
+            // 1. Datos de Referencia del Bus
+            const monitoredVehicleJourney = activity.getElementsByTagName('MonitoredVehicleJourney')[0];
+            if (!monitoredVehicleJourney) continue;
+            
+            // 2. Extracción de Datos Clave
+            const vehicleRef = monitoredVehicleJourney.getElementsByTagName('VehicleRef')[0]?.textContent.trim();
+            const lineRef = monitoredVehicleJourney.getElementsByTagName('LineRef')[0]?.textContent.trim();
+            const journeyPatternRef = monitoredVehicleJourney.getElementsByTagName('JourneyPatternRef')[0]?.textContent.trim();
+            const journeyPatternRefParts = journeyPatternRef ? journeyPatternRef.split('_') : [];
+            
+            // El TripId es crucial para unir los datos GTFS (horarios) con la posición en tiempo real
+            const tripId = journeyPatternRefParts.length > 2 ? journeyPatternRefParts[2] : null;
+
+            // 3. Datos de Posición y Tiempo
+            const vehicleLocation = monitoredVehicleJourney.getElementsByTagName('VehicleLocation')[0];
+            const latitude = vehicleLocation?.getElementsByTagName('Latitude')[0]?.textContent.trim();
+            const longitude = vehicleLocation?.getElementsByTagName('Longitude')[0]?.textContent.trim();
+            
+            const monitoredCall = monitoredVehicleJourney.getElementsByTagName('MonitoredCall')[0];
+            const stopPointRef = monitoredCall?.getElementsByTagName('StopPointRef')[0]?.textContent.trim();
+            const recordedAtTimeISO = activity.getElementsByTagName('RecordedAtTime')[0]?.textContent.trim();
+
+            if (tripId && latitude && longitude) {
+                realTimeActivities.set(tripId, {
+                    vehicleRef: vehicleRef,
+                    lineRef: lineRef,
+                    latitude: latitude,
+                    longitude: longitude,
+                    stopPointRef: stopPointRef,
+                    recordedAtTimeISO: recordedAtTimeISO
+                });
+            }
+        }
+        
+        return realTimeActivities;
     }
 
     window.onload = async () => {
