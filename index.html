@@ -694,59 +694,62 @@
     }
 
     async function buscarBusPorNumero() {
-        // Asegurarse de que las variables globales se reseteen
-        clearMapElements(); 
-        clearLineSearchMarkers();
-
         const numBus = document.getElementById("numBus").value.trim();
-        
-        // 1. Validar la entrada
         if (!numBus) {
-            alert("Por favor, introduce un número de bus.");
+            alert("Introduce un número de bus válido.");
             return;
         }
 
-        // Mostrar mapa y limpiar resultados de parada/ruta
-        document.getElementById('map').style.display = 'block';
+        // Limpieza de estado anterior
+        clearMapElements();
+        clearLineSearchMarkers();
         document.getElementById('stop-results').style.display = 'none';
         document.getElementById('route-details').style.display = 'none';
 
         try {
-            // 2. Obtener y parsear datos en tiempo real (Proxy)
-            const rtResp = await fetch("https://bizkaibus.pages.dev/bizkaibus");
-            if (!rtResp.ok) throw new Error("No se pudo obtener datos en tiempo real del proxy.");
+            // 1️⃣ Obtener datos SIRI en XML
+            const resp = await fetch("https://bizkaibus.pages.dev/bizkaibus");
+            if (!resp.ok) throw new Error("No se pudo obtener datos en tiempo real del proxy Bizkaibus.");
 
-            const rtXmlText = await rtResp.text();
-            const parser = new DOMParser();
-            // Se asume que la función parseSIRI existe y funciona
-            const realTimeActivities = parseSIRI(parser.parseFromString(rtXmlText, "text/xml")); 
+            const xmlText = await resp.text();
+            const xml = new DOMParser().parseFromString(xmlText, "application/xml");
+            const actividades = Array.from(xml.getElementsByTagName("VehicleActivity"));
 
-            // 3. Buscar el bus por su VehicleRef
+            // 2️⃣ Buscar el bus concreto
             let foundTripId = null;
-            // CLAVE: Convertimos la entrada a String para asegurar que la comparación sea correcta
-            const targetVehicleRef = String(numBus); 
+            let busLat = null;
+            let busLon = null;
 
-            for (const [tripId, busData] of realTimeActivities.entries()) {
-                // Comparamos el VehicleRef (que debe ser un String)
-                if (busData.vehicleRef === targetVehicleRef) {
-                    foundTripId = tripId;
+            for (let act of actividades) {
+                const vref = act.querySelector("VehicleRef")?.textContent.trim();
+                if (vref === numBus) {
+                    foundTripId = act.querySelector("VehicleJourneyRef")?.textContent.trim();
+                    busLat = parseFloat(act.querySelector("Latitude")?.textContent);
+                    busLon = parseFloat(act.querySelector("Longitude")?.textContent);
                     break;
                 }
             }
 
-            // 4. Actuar según el resultado de la búsqueda
-            if (foundTripId) {
-                // Bus encontrado: iniciar la localización y el renderizado de la ruta
-                await localizarBusEnTiempoReal(foundTripId);
+            // 3️⃣ Mostrar el resultado
+            if (foundTripId && !isNaN(busLat) && !isNaN(busLon)) {
+                // Dibujar marcador del bus
+                realTimeBusMarker = L.marker([busLat, busLon], { icon: busIcon }).addTo(map);
+                realTimeBusMarker.bindPopup(`Autobús Nº ${numBus}`).openPopup();
+                map.setView([busLat, busLon], 15);
+
+                // Intentar mostrar recorrido si existen datos GTFS
+                const tripInfo = tripsData.get(foundTripId);
+                if (tripInfo) {
+                    mostrarRecorrido(foundTripId, tripInfo.shape_id);
+                } else {
+                    alert(`Se encontró el bus ${numBus} en tiempo real, pero no hay información completa del viaje.`);
+                }
             } else {
-                // Bus NO encontrado: limpiar y mostrar mensaje
-                clearMapElements(); 
-                alert(`No se encontró el autobús número ${numBus} en servicio.`);
+                alert(`El autobús nº ${numBus} no se encuentra disponible en tiempo real o no existe.`);
             }
 
         } catch (error) {
             console.error("Error en buscarBusPorNumero:", error);
-            clearMapElements();
             alert("Ocurrió un error al buscar el autobús. Revisa la consola para más detalles.");
         }
     }
