@@ -112,9 +112,12 @@
     async function calentarServidor() {
       try {
         console.log("Enviando solicitud de calentamiento al servidor...");
-        await fetch("https://bizkaibus.pages.dev/bizkaibus");
+        // Hacemos la petición pero no necesitamos usar la respuesta.
+        // Su único propósito es "despertar" al servicio.
+        await fetch("/bizkaibus");
         console.log("Servidor contactado con éxito. Debería estar listo.");
       } catch (error) {
+        // Si falla, solo lo mostramos en la consola para no molestar al usuario.
         console.warn("La solicitud de calentamiento falló. La primera búsqueda podría ser lenta:", error);
       }
     }
@@ -312,7 +315,7 @@
       document.getElementById('route-details').style.display = 'none';
 
       try {
-        await fetch("https://bizkaibus.pages.dev/bizkaibus");
+        const resp = await fetch("/bizkaibus");
         const xmlText = await resp.text();
         const xml = new DOMParser().parseFromString(xmlText, "application/xml");
         const actividades = xml.getElementsByTagName("VehicleActivity");
@@ -367,7 +370,6 @@
       }
     }
 
-    // --- ¡FUNCIÓN MODIFICADA! ---
     async function buscarBusesPorParada() {
         const stopIdInput = document.getElementById("parada").value.trim();
         if (!stopIdInput) {
@@ -397,11 +399,10 @@
         const currentDay = now.getDate().toString().padStart(2, '0');
         const currentDate = `${currentYear}${currentMonth}${currentDay}`;
         const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
-        const currentSeconds = timeToSeconds(currentTime); // Hora actual en segundos
 
         const realTimeActivities = new Map();
         try {
-            await fetch("https://bizkaibus.pages.dev/bizkaibus");
+            const rtResp = await fetch("/bizkaibus");
             const rtXmlText = await rtResp.text();
             const rtXml = new DOMParser().parseFromString(rtXmlText, "application/xml");
             const rtActivityElements = Array.from(rtXml.getElementsByTagName("VehicleActivity"));
@@ -443,9 +444,12 @@
             const currentException = serviceExceptions ? serviceExceptions.get(currentDate) : undefined;
 
             let runsToday = false;
-            if (currentException === 1) runsToday = true;
-            else if (currentException === 2) runsToday = false;
-            else { 
+
+            if (currentException === 1) { 
+                runsToday = true;
+            } else if (currentException === 2) { 
+                runsToday = false;
+            } else { 
                 switch (currentDayOfWeek) {
                     case 0: runsToday = service.sunday === 1; break; 
                     case 1: runsToday = service.monday === 1; break;
@@ -456,65 +460,44 @@
                     case 6: runsToday = service.saturday === 1; break;
                 }
             }
+            
             if (!runsToday) continue;
 
             let estimatedDepartureSeconds = timeToSeconds(st.departure_time);
             let delayStatusText = "";
             let isBusOnTime = false;
 
-            // --- INICIO DE LA MODIFICACIÓN ---
             if (realTimeActivities.has(st.trip_id)) {
-                
-                // 1. Obtener todas las paradas de este viaje
-                const allStopsForThisTrip = stopTimesData
-                    .filter(stop => stop.trip_id === st.trip_id)
-                    .sort((a, b) => a.stop_sequence - b.stop_sequence);
+                const liveBusData = realTimeActivities.get(st.trip_id);
+                const liveBusStopSchedule = stopTimesData.find(
+                    rtSt => rtSt.trip_id === st.trip_id && rtSt.stop_id === liveBusData.stopPointRef
+                );
 
-                if (allStopsForThisTrip.length > 0) {
-                    // 2. Obtener la hora de salida de la primera parada
-                    const firstStopDepartureSeconds = timeToSeconds(allStopsForThisTrip[0].departure_time);
+                if (liveBusStopSchedule && liveBusData.recordedAtTimeISO) {
+                    const scheduledTimeAtLiveBusStopSeconds = timeToSeconds(liveBusStopSchedule.arrival_time);
+                    const realTimeDate = new Date(liveBusData.recordedAtTimeISO);
+                    const actualTimeAtLiveBusStopStr = `${realTimeDate.getHours().toString().padStart(2, '0')}:${realTimeDate.getMinutes().toString().padStart(2, '0')}:${realTimeDate.getSeconds().toString().padStart(2, '0')}`;
+                    const actualTimeAtLiveBusStopSeconds = timeToSeconds(actualTimeAtLiveBusStopStr);
 
-                    // 3. Comprobar si el bus ya ha salido de cabecera
-                    if (currentSeconds < firstStopDepartureSeconds) {
-                        // 4. El bus NO ha salido. Forzar "En hora".
-                        isBusOnTime = true;
-                        delayStatusText = `<span class="delay-text-stop-list on-time">(En hora)</span>`;
-                        estimatedDepartureSeconds = timeToSeconds(st.departure_time);
-                    } else {
-                        // 5. El bus SÍ ha salido. Calcular retraso real.
-                        const liveBusData = realTimeActivities.get(st.trip_id);
-                        const liveBusStopSchedule = allStopsForThisTrip.find(
-                            rtSt => rtSt.stop_id === liveBusData.stopPointRef
-                        );
+                    if (scheduledTimeAtLiveBusStopSeconds > 0 && actualTimeAtLiveBusStopSeconds > 0) {
+                        const delayAtLiveBusStopSeconds = actualTimeAtLiveBusStopSeconds - scheduledTimeAtLiveBusStopSeconds;
+                        estimatedDepartureSeconds = timeToSeconds(st.departure_time) + delayAtLiveBusStopSeconds;
+                        
+                        const delayMinutes = Math.round(delayAtLiveBusStopSeconds / 60);
 
-                        if (liveBusStopSchedule && liveBusData.recordedAtTimeISO) {
-                            const scheduledTimeAtLiveBusStopSeconds = timeToSeconds(liveBusStopSchedule.arrival_time);
-                            const realTimeDate = new Date(liveBusData.recordedAtTimeISO);
-                            const actualTimeAtLiveBusStopStr = `${realTimeDate.getHours().toString().padStart(2, '0')}:${realTimeDate.getMinutes().toString().padStart(2, '0')}:${realTimeDate.getSeconds().toString().padStart(2, '0')}`;
-                            const actualTimeAtLiveBusStopSeconds = timeToSeconds(actualTimeAtLiveBusStopStr);
-
-                            if (scheduledTimeAtLiveBusStopSeconds > 0 && actualTimeAtLiveBusStopSeconds > 0) {
-                                const delayAtLiveBusStopSeconds = actualTimeAtLiveBusStopSeconds - scheduledTimeAtLiveBusStopSeconds;
-                                estimatedDepartureSeconds = timeToSeconds(st.departure_time) + delayAtLiveBusStopSeconds;
-                                
-                                const delayMinutes = Math.round(delayAtLiveBusStopSeconds / 60);
-
-                                if (delayMinutes > 1) { 
-                                    delayStatusText = `<span class="delay-text-stop-list delay">(+${delayMinutes}m)</span>`;
-                                } else if (delayMinutes < -1) { 
-                                    // Sigue siendo un adelanto (ej. bus va rápido entre paradas), pero ya no es el falso adelanto de la cabecera
-                                    delayStatusText = `<span class="delay-text-stop-list advance">(${delayMinutes}m)</span>`;
-                                } else {
-                                    isBusOnTime = true;
-                                    delayStatusText = `<span class="delay-text-stop-list on-time">(En hora)</span>`;
-                                }
-                            }
+                        if (delayMinutes > 1) { 
+                            delayStatusText = `<span class="delay-text-stop-list delay">(+${delayMinutes}m)</span>`;
+                        } else if (delayMinutes < -1) { 
+                            delayStatusText = `<span class="delay-text-stop-list advance">(${delayMinutes}m)</span>`;
+                        } else {
+                            isBusOnTime = true;
+                            delayStatusText = `<span class="delay-text-stop-list on-time">(En hora)</span>`;
                         }
                     }
                 }
             }
-            // --- FIN DE LA MODIFICACIÓN ---
 
+            const currentSeconds = timeToSeconds(currentTime);
             if (estimatedDepartureSeconds >= currentSeconds) {
                 upcomingBuses.push({
                     linea: trip.route_id,
@@ -548,12 +531,13 @@
                 busOption.classList.add("bus-option");
 
                 let timeDisplay = `Prog.: ${bus.hora.substring(0, 5)}`;
-                if (bus.delayText && !bus.isBusOnTime) {
+                if (bus.delayText && !bus.isBusOnTime) { // Solo muestra la hora estimada si hay texto de retraso y no está en hora
                     timeDisplay += ` Est.: ${bus.estimatedDepartureTimeDisplay}`;
                 }
-                if (bus.delayText) {
+                if (bus.delayText) { // Siempre muestra el estado de retraso
                     timeDisplay += ` ${bus.delayText}`;
                 }
+
 
                 busOption.innerHTML = `
                     <span class="bus-option-linea">Línea: ${bus.linea}</span>
@@ -569,7 +553,6 @@
             busListDiv.innerHTML = `<p>No hay próximos autobuses programados o en tiempo real para esta parada hoy (${currentTime.substring(0,5)}).</p>`;
         }
     }
-    // --- FIN DE LA FUNCIÓN MODIFICADA ---
 
     async function localizarBusEnTiempoReal(targetTripId = null, targetVehicleRef = null) {
         let localBusDelayInSeconds = null;
@@ -585,7 +568,7 @@
         }
 
         try {
-            await fetch("https://bizkaibus.pages.dev/bizkaibus");
+            const resp = await fetch("/bizkaibus");
             const xmlText = await resp.text();
             const xml = new DOMParser().parseFromString(xmlText, "application/xml");
             const actividades = xml.getElementsByTagName("VehicleActivity");
@@ -635,6 +618,7 @@
                         currentBusLon = lon;
                         foundTripIdForBus = jref; 
 
+                        // --- INICIO DE LA MODIFICACIÓN ---
                         if (recordedAtTimeISO && spRef && jref) {
                             const allStopsForTrip = stopTimesData
                                 .filter(st => st.trip_id === jref)
@@ -647,11 +631,13 @@
                                 const currentSeconds = timeToSeconds(currentTimeStr);
                                 const delayInfoEl = document.getElementById('delay-info');
 
+                                // Comprobamos si la hora actual es anterior a la salida de la primera parada.
                                 if (currentSeconds < firstStopDepartureSeconds) {
-                                    localBusDelayInSeconds = 0; 
+                                    localBusDelayInSeconds = 0; // Se considera en hora.
                                     delayInfoEl.textContent = "En hora (esperando salida de cabecera).";
-                                    delayInfoEl.style.color = '#f0ad4e'; 
+                                    delayInfoEl.style.color = '#f0ad4e'; // Naranja (color "on-time").
                                 } else {
+                                    // Si el bus ya debería haber salido, calculamos el retraso/adelanto real.
                                     const tripStopTimes = allStopsForTrip.filter(st => st.stop_id === spRef);
                                     if (tripStopTimes.length > 0) {
                                         const scheduledArrivalTimeStr = tripStopTimes[0].arrival_time;
@@ -682,6 +668,7 @@
                                 }
                             }
                         }
+                        // --- FIN DE LA MODIFICACIÓN ---
                         break;
                     }
                 }
@@ -865,32 +852,51 @@
     }
 
     function rellenarYBuscarLinea(lineaId) {
+        // 1. Rellena el campo de Línea y limpia los otros
         document.getElementById("linea").value = lineaId;
         document.getElementById("parada").value = "";
         document.getElementById("numBus").value = "";
+
+        // 2. Ejecuta la función de búsqueda de línea
         buscarBusesPorLinea(); 
+        
+        // Opcional: Desplazarse a la parte superior
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function rellenarYBuscarParada(paradaId) {
+        // Si no hay ID de parada, no hacemos nada (ej: si spRef es null)
         if (!paradaId) return;
+
+        // 1. Rellena el campo de Parada y limpia los otros
         document.getElementById("parada").value = paradaId;
         document.getElementById("linea").value = "";
         document.getElementById("numBus").value = "";
+        
+        // 2. Ejecuta la función de búsqueda de parada
         buscarBusesPorParada(); 
+        
+        // Opcional: Desplazarse a la parte superior
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function rellenarYBuscarBus(busNumero) {
+        // 1. Rellena el campo de Número de Bus y limpia los otros
         document.getElementById("numBus").value = busNumero;
         document.getElementById("linea").value = "";
         document.getElementById("parada").value = "";
+
+        // 2. Ejecuta la función de búsqueda de bus
         buscarBusPorNumero(); 
+        
+        // Opcional: Desplazarse a la parte superior
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     window.onload = async () => {
+      // Llamada para "despertar" al servidor en segundo plano
       calentarServidor();
+      
       await Promise.all([cargarBusInfo(), cargarDatosGTFS()]);  
       document.getElementById('stop-results').style.display = 'none';
       document.getElementById('route-details').style.display = 'none';
