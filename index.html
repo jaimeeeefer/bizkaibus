@@ -60,7 +60,9 @@
   <script>
     const SHEET_TSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYeZkna4mwxp3p2azwTgAPcjeSBoUU_rhWW5gVZ7hqotNtojQOHtsjbEnnlJbrijBVwck_kWERE__6/pub?output=tsv"; 
     const STOPS_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/stops.txt";
-    const STOP_TIMES_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/stop_times.txt";
+    const STOP_TIMES1_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/stop_times1.txt";
+    const STOP_TIMES2_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/stop_times2.txt";
+    const STOP_TIMES3_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/stop_times3.txt";
     const TRIPS_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/trips.txt";
     const CALENDAR_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/calendar.txt";
     const CALENDAR_DATES_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/calendar_dates.txt";
@@ -165,30 +167,27 @@
           }
         });
 
-        const resStopTimes = await fetch(STOP_TIMES_URL);
-        if (!resStopTimes.ok) throw new Error("No se pudo descargar stop_times.txt");
-        
-        const textStopTimes = await resStopTimes.text();
-        
-        // Usamos split solo una vez para sacar líneas
-        const linesStopTimes = textStopTimes.split("\n");
+        const stopTimesPromises = [
+            fetch(STOP_TIMES1_URL).then(res => res.text()),
+            fetch(STOP_TIMES2_URL).then(res => res.text()),
+            fetch(STOP_TIMES3_URL).then(res => res.text())
+        ];
+        const stopTimesTexts = await Promise.all(stopTimesPromises);
 
-        // Usamos un bucle for clásico que es mucho más rápido y gasta menos memoria que .map()
-        for (let i = 1; i < linesStopTimes.length; i++) {
-            const line = linesStopTimes[i].trim();
-            if (line) {
-                const row = line.split(","); // Dividimos solo la línea actual
+        stopTimesTexts.forEach(text => {
+            const rowsStopTimes = text.trim().split("\n").map(row => row.split(","));
+            rowsStopTimes.slice(1).forEach(row => {
                 if (row.length >= 5) {
                     stopTimesData.push({
-                        trip_id: row[0].trim(),
-                        arrival_time: row[1].trim(),
-                        departure_time: row[2].trim(),
-                        stop_id: row[3].trim(),
-                        stop_sequence: parseInt(row[4])
+                        trip_id: row[0]?.trim(),
+                        arrival_time: row[1]?.trim(),
+                        departure_time: row[2]?.trim(),
+                        stop_id: row[3]?.trim(),
+                        stop_sequence: parseInt(row[4]),
                     });
                 }
-            }
-        }
+            });
+        });
 
         const resTrips = await fetch(TRIPS_URL);
         const textTrips = await resTrips.text();
