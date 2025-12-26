@@ -60,7 +60,7 @@
   <script>
     const SHEET_TSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYeZkna4mwxp3p2azwTgAPcjeSBoUU_rhWW5gVZ7hqotNtojQOHtsjbEnnlJbrijBVwck_kWERE__6/pub?output=tsv"; 
     const STOPS_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/stops.txt";
-    const STOP_TIMES_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/datos/stop_times.txt";
+    const STOP_TIMES_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/stop_times.txt";
     const TRIPS_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/trips.txt";
     const CALENDAR_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/calendar.txt";
     const CALENDAR_DATES_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/calendar_dates.txt";
@@ -166,22 +166,29 @@
         });
 
         const resStopTimes = await fetch(STOP_TIMES_URL);
+        if (!resStopTimes.ok) throw new Error("No se pudo descargar stop_times.txt");
+        
         const textStopTimes = await resStopTimes.text();
+        
+        // Usamos split solo una vez para sacar líneas
+        const linesStopTimes = textStopTimes.split("\n");
 
-        // Procesamos el texto
-        const rowsStopTimes = textStopTimes.trim().split("\n").map(row => row.split(","));
-        rowsStopTimes.slice(1).forEach(row => {
-            // Verificamos que la fila tenga datos suficientes
-            if (row.length >= 5) {
-                stopTimesData.push({
-                    trip_id: row[0]?.trim(),       // Columna 1: trip_id
-                    arrival_time: row[1]?.trim(),  // Columna 2: arrival_time
-                    departure_time: row[2]?.trim(),// Columna 3: departure_time
-                    stop_id: row[3]?.trim(),       // Columna 4: stop_id
-                    stop_sequence: parseInt(row[4])// Columna 5: stop_sequence
-                });
+        // Usamos un bucle for clásico que es mucho más rápido y gasta menos memoria que .map()
+        for (let i = 1; i < linesStopTimes.length; i++) {
+            const line = linesStopTimes[i].trim();
+            if (line) {
+                const row = line.split(","); // Dividimos solo la línea actual
+                if (row.length >= 5) {
+                    stopTimesData.push({
+                        trip_id: row[0].trim(),
+                        arrival_time: row[1].trim(),
+                        departure_time: row[2].trim(),
+                        stop_id: row[3].trim(),
+                        stop_sequence: parseInt(row[4])
+                    });
+                }
             }
-        });
+        }
 
         const resTrips = await fetch(TRIPS_URL);
         const textTrips = await resTrips.text();
