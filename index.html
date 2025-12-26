@@ -60,9 +60,7 @@
   <script>
     const SHEET_TSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYeZkna4mwxp3p2azwTgAPcjeSBoUU_rhWW5gVZ7hqotNtojQOHtsjbEnnlJbrijBVwck_kWERE__6/pub?output=tsv"; 
     const STOPS_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/stops.txt";
-    const STOP_TIMES1_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/stop_times1.txt";
-    const STOP_TIMES2_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/stop_times2.txt";
-    const STOP_TIMES3_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/stop_times3.txt";
+    const STOP_TIMES_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/datos/stop_times.txt";
     const TRIPS_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/trips.txt";
     const CALENDAR_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/calendar.txt";
     const CALENDAR_DATES_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/calendar_dates.txt";
@@ -167,26 +165,22 @@
           }
         });
 
-        const stopTimesPromises = [
-            fetch(STOP_TIMES1_URL).then(res => res.text()),
-            fetch(STOP_TIMES2_URL).then(res => res.text()),
-            fetch(STOP_TIMES3_URL).then(res => res.text())
-        ];
-        const stopTimesTexts = await Promise.all(stopTimesPromises);
+        const resStopTimes = await fetch(STOP_TIMES_URL);
+        const textStopTimes = await resStopTimes.text();
 
-        stopTimesTexts.forEach(text => {
-            const rowsStopTimes = text.trim().split("\n").map(row => row.split(","));
-            rowsStopTimes.slice(1).forEach(row => {
-                if (row.length >= 5) {
-                    stopTimesData.push({
-                        trip_id: row[0]?.trim(),
-                        arrival_time: row[1]?.trim(),
-                        departure_time: row[2]?.trim(),
-                        stop_id: row[3]?.trim(),
-                        stop_sequence: parseInt(row[4]),
-                    });
-                }
-            });
+        // Procesamos el texto
+        const rowsStopTimes = textStopTimes.trim().split("\n").map(row => row.split(","));
+        rowsStopTimes.slice(1).forEach(row => {
+            // Verificamos que la fila tenga datos suficientes
+            if (row.length >= 5) {
+                stopTimesData.push({
+                    trip_id: row[0]?.trim(),       // Columna 1: trip_id
+                    arrival_time: row[1]?.trim(),  // Columna 2: arrival_time
+                    departure_time: row[2]?.trim(),// Columna 3: departure_time
+                    stop_id: row[3]?.trim(),       // Columna 4: stop_id
+                    stop_sequence: parseInt(row[4])// Columna 5: stop_sequence
+                });
+            }
         });
 
         const resTrips = await fetch(TRIPS_URL);
