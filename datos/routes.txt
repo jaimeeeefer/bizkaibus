@@ -65,35 +65,36 @@ route_id,agency_id,route_short_name,route_long_name,route_desc,route_type,route_
 3518,200,A3518,BILBAO-MUNGIA-BAKIO (Autopista),A3518-BILBAO-MUNGIA-BAKIO (Autopista),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3518&numRuta=001,9CCD64,01573C,64,1,1
 3522,200,A3522,MUNGIA-DERIO-Gurutzeta/Cruces,A3522-MUNGIA-DERIO-Gurutzeta/Cruces,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3522&numRuta=001,9CCD64,01573C,65,1,1
 3523,200,A3523,BILBAO-Galdakao Ospitalea-GERNIKA LUMO-AULESTI-LEKEITIO,A3523-BILBAO-Galdakao Ospitalea-GERNIKA LUMO-AULESTI-LEKEITIO,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3523&numRuta=001,9CCD64,01573C,66,1,1
-3525,200,A3525,GERNIKA LUMO-AMOREBIETA ETXANO-UPV/EHU,A3525-GERNIKA LUMO-AMOREBIETA ETXANO-UPV/EHU,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3525&numRuta=001,9CCD64,01573C,67,1,1
-3526,200,A3526,MUNGIA-GERNIKA LUMO-IBARRANGELU,A3526-MUNGIA-GERNIKA LUMO-IBARRANGELU,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3526&numRuta=001,9CCD64,01573C,68,1,1
-3527,200,A3527,BILBAO-MUNGIA-BERMEO Autopista,A3527-BILBAO-MUNGIA-BERMEO Autopista,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3527&numRuta=001,9CCD64,01573C,69,1,1
-3528,200,A3528,BERMEO-MUNGIA-DERIO-UPV/EHU,A3528-BERMEO-MUNGIA-DERIO-UPV/EHU,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3528&numRuta=001,9CCD64,01573C,70,1,1
-3529,200,A3529,MUNGIA - GAMIZ FIKA,A3529-MUNGIA - GAMIZ FIKA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3529&numRuta=001,9CCD64,01573C,71,1,1
-3530,200,A3530,MUNGIA - MEÑAKA - ARRIETA,A3530-MUNGIA - MEÑAKA - ARRIETA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3530&numRuta=001,9CCD64,01573C,72,1,1
-3531,200,A3531,LEIOA - URDULIZ OSPITALEA - MUNGIA,A3531-LEIOA - URDULIZ OSPITALEA - MUNGIA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3531&numRuta=001,9CCD64,01573C,73,1,1
-3532,200,A3532,GERNIKA LUMO - EA,A3532-GERNIKA LUMO - EA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3532&numRuta=001,9CCD64,01573C,74,1,1
-3533,200,A3533,MORGA - GERNIKA LUMO - MENDATA,A3533-MORGA - GERNIKA LUMO - MENDATA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3533&numRuta=001,9CCD64,01573C,75,1,1
-3534,200,A3534,ERRIGOITI - GERNIKA LUMO - EREÑO,A3534-ERRIGOITI - GERNIKA LUMO - EREÑO,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3534&numRuta=001,9CCD64,01573C,76,1,1
-3537,200,A3537,PLENTZIA - GORLIZ - MUNGIA,A3537-PLENTZIA - GORLIZ - MUNGIA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3537&numRuta=001,9CCD64,01573C,77,1,1
-3613,200,A3613,BILBAO-UGAO MIRABALLES-OROZKO,A3613-BILBAO-UGAO MIRABALLES-OROZKO,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3613&numRuta=001,9CCD64,01573C,78,1,1
-3622,200,A3622,BILBAO-BASAURI-ARTUNDUAGA-SAN MIGUEL-ZARATAMO,A3622-BILBAO-BASAURI-ARTUNDUAGA-SAN MIGUEL-ZARATAMO,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3622&numRuta=001,9CCD64,01573C,79,1,1
-3631,200,A3631,BILBAO - GALDAKAO - LARRABETZU,A3631-BILBAO - GALDAKAO - LARRABETZU,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3631&numRuta=001,9CCD64,01573C,80,1,1
-3632,200,A3632,BILBAO-ETXEBARRI-BASAURI-San Miguel (Begoña),A3632-BILBAO-ETXEBARRI-BASAURI-San Miguel (Begoña),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3632&numRuta=001,9CCD64,01573C,81,1,1
-3641,200,A3641,NERBIOI GARAIA/ALTO NERVION-ARRIGORRIAGA-GALDAKAO OSPITALEA,A3641-NERBIOI GARAIA/ALTO NERVION-ARRIGORRIAGA-GALDAKAO OSPITALEA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3641&numRuta=001,9CCD64,01573C,82,1,1
-3642,200,A3642,BASAURI - HOSPITAL GALDAKAO OSPITALEA (Bengoetxe),A3642-BASAURI - HOSPITAL GALDAKAO OSPITALEA (Bengoetxe),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3642&numRuta=001,9CCD64,01573C,83,1,1
-3911,200,A3911,BILBAO-HOSPITAL GALDAKAO OSPITALEA-LEMOA-DURANGO-ELORRIO,A3911-BILBAO-HOSPITAL GALDAKAO OSPITALEA-LEMOA-DURANGO-ELORRIO,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3911&numRuta=001,9CCD64,01573C,84,1,1
-3912,200,A3912,BILBAO-HOSPITAL GALDAKAO OSPITALEA-LEMOA-DURANGO-ERMUA-EIBAR,A3912-BILBAO-HOSPITAL GALDAKAO OSPITALEA-LEMOA-DURANGO-ERMUA-EIBAR,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3912&numRuta=001,9CCD64,01573C,85,1,1
-3913,200,A3913,ARRAZOLA - DURANGO,A3913-ARRAZOLA - DURANGO,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3913&numRuta=001,9CCD64,01573C,86,1,1
-3915,200,A3915,BILBAO-DURANGO-ONDARROA (Autopista),A3915-BILBAO-DURANGO-ONDARROA (Autopista),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3915&numRuta=001,9CCD64,01573C,87,1,1
-3916,200,A3916,BILBAO-ERMUA-ONDARROA (Autopista),A3916-BILBAO-ERMUA-ONDARROA (Autopista),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3916&numRuta=001,9CCD64,01573C,88,1,1
-3917,200,A3917,BILBAO-HOSPITAL GALDAKAO OSPITALEA-LEMOA-ZEANURI,A3917-BILBAO-HOSPITAL GALDAKAO OSPITALEA-LEMOA-ZEANURI,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3917&numRuta=001,9CCD64,01573C,89,1,1
-3923,200,A3923,BILBAO-DURANGO-ELORRIO (Autopista),A3923-BILBAO-DURANGO-ELORRIO (Autopista),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3923&numRuta=001,9CCD64,01573C,90,1,1
-3924,200,A3924,ERMUA - DURANGO - UPV/EHU,A3924-ERMUA - DURANGO - UPV/EHU,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3924&numRuta=001,9CCD64,01573C,91,1,1
-3925,200,A3925,BILBAO-LEMOA-OTXANDIO-UBIDE,A3925-BILBAO-LEMOA-OTXANDIO-UBIDE,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3925&numRuta=001,9CCD64,01573C,92,1,1
-3926,200,A3926,BILBAO-ERMUA-EIBAR (Autopista),A3926-BILBAO-ERMUA-EIBAR (Autopista),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3926&numRuta=001,9CCD64,01573C,93,1,1
-3927,200,A3927,BILBAO-LEMOA-ZEANURI Autopista,A3927-BILBAO-LEMOA-ZEANURI Autopista,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3927&numRuta=001,9CCD64,01573C,94,1,1
-3928,200,A3928,ARTEA - ZEBERIO - UGAO MIRABALLES,A3928-ARTEA - ZEBERIO - UGAO MIRABALLES,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3928&numRuta=001,9CCD64,01573C,95,1,1
-3930,200,A3930,BILBAO - GALDAKAO (Autopista),A3930-BILBAO - GALDAKAO (Autopista),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3930&numRuta=001,9CCD64,01573C,96,1,1
-3932,200,A3932,GALDAKAO - Metro BOLUETA,A3932-GALDAKAO - Metro BOLUETA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3932&numRuta=001,9CCD64,01573C,97,1,1
-3933,200,A3933,BILBAO - DURANGO (Autopista),A3933-BILBAO - DURANGO (Autopista),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3933&numRuta=001,9CCD64,01573C,98,1,1
+3524,200,A3524,BERMEO - BAKIO,A3524-BERMEO - BAKIO,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3524&numRuta=001,9CCD64,01573C,67,1,1
+3525,200,A3525,GERNIKA LUMO-AMOREBIETA ETXANO-UPV/EHU,A3525-GERNIKA LUMO-AMOREBIETA ETXANO-UPV/EHU,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3525&numRuta=001,9CCD64,01573C,68,1,1
+3526,200,A3526,MUNGIA-GERNIKA LUMO-IBARRANGELU,A3526-MUNGIA-GERNIKA LUMO-IBARRANGELU,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3526&numRuta=001,9CCD64,01573C,69,1,1
+3527,200,A3527,BILBAO-MUNGIA-BERMEO Autopista,A3527-BILBAO-MUNGIA-BERMEO Autopista,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3527&numRuta=001,9CCD64,01573C,70,1,1
+3528,200,A3528,BERMEO-MUNGIA-DERIO-UPV/EHU,A3528-BERMEO-MUNGIA-DERIO-UPV/EHU,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3528&numRuta=001,9CCD64,01573C,71,1,1
+3529,200,A3529,MUNGIA - GAMIZ FIKA,A3529-MUNGIA - GAMIZ FIKA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3529&numRuta=001,9CCD64,01573C,72,1,1
+3530,200,A3530,MUNGIA - MEÑAKA - ARRIETA,A3530-MUNGIA - MEÑAKA - ARRIETA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3530&numRuta=001,9CCD64,01573C,73,1,1
+3531,200,A3531,LEIOA - URDULIZ OSPITALEA - MUNGIA,A3531-LEIOA - URDULIZ OSPITALEA - MUNGIA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3531&numRuta=001,9CCD64,01573C,74,1,1
+3532,200,A3532,GERNIKA LUMO - EA,A3532-GERNIKA LUMO - EA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3532&numRuta=001,9CCD64,01573C,75,1,1
+3533,200,A3533,MORGA - GERNIKA LUMO - MENDATA,A3533-MORGA - GERNIKA LUMO - MENDATA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3533&numRuta=001,9CCD64,01573C,76,1,1
+3534,200,A3534,ERRIGOITI - GERNIKA LUMO - EREÑO,A3534-ERRIGOITI - GERNIKA LUMO - EREÑO,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3534&numRuta=001,9CCD64,01573C,77,1,1
+3537,200,A3537,PLENTZIA - GORLIZ - MUNGIA,A3537-PLENTZIA - GORLIZ - MUNGIA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3537&numRuta=001,9CCD64,01573C,78,1,1
+3613,200,A3613,BILBAO-UGAO MIRABALLES-OROZKO,A3613-BILBAO-UGAO MIRABALLES-OROZKO,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3613&numRuta=001,9CCD64,01573C,79,1,1
+3622,200,A3622,BILBAO-BASAURI-ARTUNDUAGA-SAN MIGUEL-ZARATAMO,A3622-BILBAO-BASAURI-ARTUNDUAGA-SAN MIGUEL-ZARATAMO,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3622&numRuta=001,9CCD64,01573C,80,1,1
+3631,200,A3631,BILBAO - GALDAKAO - LARRABETZU,A3631-BILBAO - GALDAKAO - LARRABETZU,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3631&numRuta=001,9CCD64,01573C,81,1,1
+3632,200,A3632,BILBAO-ETXEBARRI-BASAURI-San Miguel (Begoña),A3632-BILBAO-ETXEBARRI-BASAURI-San Miguel (Begoña),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3632&numRuta=001,9CCD64,01573C,82,1,1
+3641,200,A3641,NERBIOI GARAIA/ALTO NERVION-ARRIGORRIAGA-GALDAKAO OSPITALEA,A3641-NERBIOI GARAIA/ALTO NERVION-ARRIGORRIAGA-GALDAKAO OSPITALEA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3641&numRuta=001,9CCD64,01573C,83,1,1
+3642,200,A3642,BASAURI - HOSPITAL GALDAKAO OSPITALEA (Bengoetxe),A3642-BASAURI - HOSPITAL GALDAKAO OSPITALEA (Bengoetxe),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3642&numRuta=001,9CCD64,01573C,84,1,1
+3911,200,A3911,BILBAO-HOSPITAL GALDAKAO OSPITALEA-LEMOA-DURANGO-ELORRIO,A3911-BILBAO-HOSPITAL GALDAKAO OSPITALEA-LEMOA-DURANGO-ELORRIO,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3911&numRuta=001,9CCD64,01573C,85,1,1
+3912,200,A3912,BILBAO-HOSPITAL GALDAKAO OSPITALEA-LEMOA-DURANGO-ERMUA-EIBAR,A3912-BILBAO-HOSPITAL GALDAKAO OSPITALEA-LEMOA-DURANGO-ERMUA-EIBAR,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3912&numRuta=001,9CCD64,01573C,86,1,1
+3913,200,A3913,ARRAZOLA - DURANGO,A3913-ARRAZOLA - DURANGO,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3913&numRuta=001,9CCD64,01573C,87,1,1
+3915,200,A3915,BILBAO-DURANGO-ONDARROA (Autopista),A3915-BILBAO-DURANGO-ONDARROA (Autopista),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3915&numRuta=001,9CCD64,01573C,88,1,1
+3916,200,A3916,BILBAO-ERMUA-ONDARROA (Autopista),A3916-BILBAO-ERMUA-ONDARROA (Autopista),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3916&numRuta=001,9CCD64,01573C,89,1,1
+3917,200,A3917,BILBAO-HOSPITAL GALDAKAO OSPITALEA-LEMOA-ZEANURI,A3917-BILBAO-HOSPITAL GALDAKAO OSPITALEA-LEMOA-ZEANURI,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3917&numRuta=001,9CCD64,01573C,90,1,1
+3923,200,A3923,BILBAO-DURANGO-ELORRIO (Autopista),A3923-BILBAO-DURANGO-ELORRIO (Autopista),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3923&numRuta=001,9CCD64,01573C,91,1,1
+3924,200,A3924,ERMUA - DURANGO - UPV/EHU,A3924-ERMUA - DURANGO - UPV/EHU,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3924&numRuta=001,9CCD64,01573C,92,1,1
+3925,200,A3925,BILBAO-LEMOA-OTXANDIO-UBIDE,A3925-BILBAO-LEMOA-OTXANDIO-UBIDE,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3925&numRuta=001,9CCD64,01573C,93,1,1
+3926,200,A3926,BILBAO-ERMUA-EIBAR (Autopista),A3926-BILBAO-ERMUA-EIBAR (Autopista),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3926&numRuta=001,9CCD64,01573C,94,1,1
+3927,200,A3927,BILBAO-LEMOA-ZEANURI Autopista,A3927-BILBAO-LEMOA-ZEANURI Autopista,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3927&numRuta=001,9CCD64,01573C,95,1,1
+3928,200,A3928,ARTEA - ZEBERIO - UGAO MIRABALLES,A3928-ARTEA - ZEBERIO - UGAO MIRABALLES,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3928&numRuta=001,9CCD64,01573C,96,1,1
+3930,200,A3930,BILBAO - GALDAKAO (Autopista),A3930-BILBAO - GALDAKAO (Autopista),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3930&numRuta=001,9CCD64,01573C,97,1,1
+3932,200,A3932,GALDAKAO - Metro BOLUETA,A3932-GALDAKAO - Metro BOLUETA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3932&numRuta=001,9CCD64,01573C,98,1,1
+3933,200,A3933,BILBAO - DURANGO (Autopista),A3933-BILBAO - DURANGO (Autopista),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3933&numRuta=001,9CCD64,01573C,99,1,1
