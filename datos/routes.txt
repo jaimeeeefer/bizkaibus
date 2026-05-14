@@ -45,27 +45,27 @@ route_id,agency_id,route_short_name,route_long_name,route_desc,route_type,route_
 3335,200,A3335,MUSKIZ-ZIERBENA-SESTAO,A3335-MUSKIZ-ZIERBENA-SESTAO,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3335&numRuta=001,9CCD64,01573C,44,1,1
 3336,200,A3336,BILBAO-MUSKIZ,A3336-BILBAO-MUSKIZ,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3336&numRuta=001,9CCD64,01573C,45,1,1
 3338,200,A3338,MUSKIZ-BARAKALDO-Areeta/Las Arenas,A3338-MUSKIZ-BARAKALDO-Areeta/Las Arenas,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3338&numRuta=001,9CCD64,01573C,46,1,1
-3340,200,A3340,BILBAO -  ABANTO ZIERBENA - MUSKIZ (Autopista),A3340-BILBAO -  ABANTO ZIERBENA - MUSKIZ (Autopista),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3340&numRuta=001,9CCD64,01573C,47,1,1
-3341,200,A3341,BILBAO-Sodupe-Arrespalditza/Respaldiza,A3341-BILBAO-Sodupe-Arrespalditza/Respaldiza,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3341&numRuta=001,9CCD64,01573C,48,1,1
-3342,200,A3342,BILBAO-Sodupe-ARTZINIEGA,A3342-BILBAO-Sodupe-ARTZINIEGA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3342&numRuta=001,9CCD64,01573C,49,1,1
-3343,200,A3343,BILBAO - Sodupe - GORDEXOLA,A3343-BILBAO - Sodupe - GORDEXOLA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3343&numRuta=001,9CCD64,01573C,50,1,1
-3411,200,A3411,BILBAO-GETXO-Azkorri,A3411-BILBAO-GETXO-Azkorri,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3411&numRuta=001,9CCD64,01573C,51,1,1
-3414,200,A3414,BILBAO-GETXO (Artxandako tuneletatik/por túneles Artxanda),A3414-BILBAO-GETXO (Artxandako tuneletatik/por túneles Artxanda),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3414&numRuta=001,9CCD64,01573C,52,1,1
-3422,200,A3422,AREETA/LAS ARENAS-BERANGO (Artea m.g/CC Artea),A3422-AREETA/LAS ARENAS-BERANGO (Artea m.g/CC Artea),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3422&numRuta=001,9CCD64,01573C,53,1,1
-3451,200,A3451,AREETA/LAS ARENAS-ARMINTZA,A3451-AREETA/LAS ARENAS-ARMINTZA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3451&numRuta=001,9CCD64,01573C,54,1,1
-3471,200,A3471,GETXO-GURUTZETA/CRUCES (Faduratik/Por Fadura),A3471-GETXO-GURUTZETA/CRUCES (Faduratik/Por Fadura),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3471&numRuta=001,9CCD64,01573C,55,1,1
-3472,200,A3472,GETXO-GURUTZETA/CRUCES (Areetatik/desde las Arenas),A3472-GETXO-GURUTZETA/CRUCES (Areetatik/desde las Arenas),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3472&numRuta=001,9CCD64,01573C,56,1,1
-3499,200,A3499,PLENTZIA-GORLIZ,A3499-PLENTZIA-GORLIZ,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3499&numRuta=001,9CCD64,01573C,57,1,1
-3512,200,A3512,BILBAO - LEKEITIO (Autopista),A3512-BILBAO - LEKEITIO (Autopista),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3512&numRuta=001,9CCD64,01573C,58,1,1
-3513,200,A3513,BILBAO-Galdakao Ospitalea-GERNIKA LUMO-EA-LEKEITIO,A3513-BILBAO-Galdakao Ospitalea-GERNIKA LUMO-EA-LEKEITIO,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3513&numRuta=001,9CCD64,01573C,59,1,1
-3514,200,A3514,BILBAO - AMOREBIETA ETXANO - GERNIKA LUMO,A3514-BILBAO - AMOREBIETA ETXANO - GERNIKA LUMO,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3514&numRuta=001,9CCD64,01573C,60,1,1
-3515,200,A3515,BILBAO-AMOREBIETA ETXANO-GERNIKA LUMO-BERMEO,A3515-BILBAO-AMOREBIETA ETXANO-GERNIKA LUMO-BERMEO,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3515&numRuta=001,9CCD64,01573C,61,1,1
-3516,200,A3516,BILBAO-MUNGIA (Autopista),A3516-BILBAO-MUNGIA (Autopista),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3516&numRuta=001,9CCD64,01573C,62,1,1
-3517,200,A3517,BILBAO-DERIO-MUNGIA,A3517-BILBAO-DERIO-MUNGIA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3517&numRuta=001,9CCD64,01573C,63,1,1
-3518,200,A3518,BILBAO-MUNGIA-BAKIO (Autopista),A3518-BILBAO-MUNGIA-BAKIO (Autopista),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3518&numRuta=001,9CCD64,01573C,64,1,1
-3522,200,A3522,MUNGIA-DERIO-Gurutzeta/Cruces,A3522-MUNGIA-DERIO-Gurutzeta/Cruces,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3522&numRuta=001,9CCD64,01573C,65,1,1
-3523,200,A3523,BILBAO-Galdakao Ospitalea-GERNIKA LUMO-AULESTI-LEKEITIO,A3523-BILBAO-Galdakao Ospitalea-GERNIKA LUMO-AULESTI-LEKEITIO,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3523&numRuta=001,9CCD64,01573C,66,1,1
-3524,200,A3524,BERMEO - BAKIO,A3524-BERMEO - BAKIO,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3524&numRuta=001,9CCD64,01573C,67,1,1
+3339,200,A3339,Gurutzeta/Cruces-BARAKALDO-La Arena,A3339-Gurutzeta/Cruces-BARAKALDO-La Arena,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3339&numRuta=001,9CCD64,01573C,47,1,1
+3340,200,A3340,BILBAO -  ABANTO ZIERBENA - MUSKIZ (Autopista),A3340-BILBAO -  ABANTO ZIERBENA - MUSKIZ (Autopista),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3340&numRuta=001,9CCD64,01573C,48,1,1
+3341,200,A3341,BILBAO-Sodupe-Arrespalditza/Respaldiza,A3341-BILBAO-Sodupe-Arrespalditza/Respaldiza,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3341&numRuta=001,9CCD64,01573C,49,1,1
+3342,200,A3342,BILBAO-Sodupe-ARTZINIEGA,A3342-BILBAO-Sodupe-ARTZINIEGA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3342&numRuta=001,9CCD64,01573C,50,1,1
+3343,200,A3343,BILBAO - Sodupe - GORDEXOLA,A3343-BILBAO - Sodupe - GORDEXOLA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3343&numRuta=001,9CCD64,01573C,51,1,1
+3411,200,A3411,BILBAO-GETXO-Azkorri,A3411-BILBAO-GETXO-Azkorri,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3411&numRuta=001,9CCD64,01573C,52,1,1
+3414,200,A3414,BILBAO-GETXO (Artxandako tuneletatik/por túneles Artxanda),A3414-BILBAO-GETXO (Artxandako tuneletatik/por túneles Artxanda),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3414&numRuta=001,9CCD64,01573C,53,1,1
+3422,200,A3422,AREETA/LAS ARENAS-BERANGO (Artea m.g/CC Artea),A3422-AREETA/LAS ARENAS-BERANGO (Artea m.g/CC Artea),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3422&numRuta=001,9CCD64,01573C,54,1,1
+3451,200,A3451,AREETA/LAS ARENAS-ARMINTZA,A3451-AREETA/LAS ARENAS-ARMINTZA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3451&numRuta=001,9CCD64,01573C,55,1,1
+3471,200,A3471,GETXO-GURUTZETA/CRUCES (Faduratik/Por Fadura),A3471-GETXO-GURUTZETA/CRUCES (Faduratik/Por Fadura),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3471&numRuta=001,9CCD64,01573C,56,1,1
+3472,200,A3472,GETXO-GURUTZETA/CRUCES (Areetatik/desde las Arenas),A3472-GETXO-GURUTZETA/CRUCES (Areetatik/desde las Arenas),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3472&numRuta=001,9CCD64,01573C,57,1,1
+3499,200,A3499,PLENTZIA-GORLIZ,A3499-PLENTZIA-GORLIZ,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3499&numRuta=001,9CCD64,01573C,58,1,1
+3512,200,A3512,BILBAO - LEKEITIO (Autopista),A3512-BILBAO - LEKEITIO (Autopista),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3512&numRuta=001,9CCD64,01573C,59,1,1
+3513,200,A3513,BILBAO-Galdakao Ospitalea-GERNIKA LUMO-EA-LEKEITIO,A3513-BILBAO-Galdakao Ospitalea-GERNIKA LUMO-EA-LEKEITIO,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3513&numRuta=001,9CCD64,01573C,60,1,1
+3514,200,A3514,BILBAO - AMOREBIETA ETXANO - GERNIKA LUMO,A3514-BILBAO - AMOREBIETA ETXANO - GERNIKA LUMO,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3514&numRuta=001,9CCD64,01573C,61,1,1
+3515,200,A3515,BILBAO-AMOREBIETA ETXANO-GERNIKA LUMO-BERMEO,A3515-BILBAO-AMOREBIETA ETXANO-GERNIKA LUMO-BERMEO,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3515&numRuta=001,9CCD64,01573C,62,1,1
+3516,200,A3516,BILBAO-MUNGIA (Autopista),A3516-BILBAO-MUNGIA (Autopista),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3516&numRuta=001,9CCD64,01573C,63,1,1
+3517,200,A3517,BILBAO-DERIO-MUNGIA,A3517-BILBAO-DERIO-MUNGIA,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3517&numRuta=001,9CCD64,01573C,64,1,1
+3518,200,A3518,BILBAO-MUNGIA-BAKIO (Autopista),A3518-BILBAO-MUNGIA-BAKIO (Autopista),3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3518&numRuta=001,9CCD64,01573C,65,1,1
+3522,200,A3522,MUNGIA-DERIO-Gurutzeta/Cruces,A3522-MUNGIA-DERIO-Gurutzeta/Cruces,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3522&numRuta=001,9CCD64,01573C,66,1,1
+3523,200,A3523,BILBAO-Galdakao Ospitalea-GERNIKA LUMO-AULESTI-LEKEITIO,A3523-BILBAO-Galdakao Ospitalea-GERNIKA LUMO-AULESTI-LEKEITIO,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3523&numRuta=001,9CCD64,01573C,67,1,1
 3525,200,A3525,GERNIKA LUMO-AMOREBIETA ETXANO-UPV/EHU,A3525-GERNIKA LUMO-AMOREBIETA ETXANO-UPV/EHU,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3525&numRuta=001,9CCD64,01573C,68,1,1
 3526,200,A3526,MUNGIA-GERNIKA LUMO-IBARRANGELU,A3526-MUNGIA-GERNIKA LUMO-IBARRANGELU,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3526&numRuta=001,9CCD64,01573C,69,1,1
 3527,200,A3527,BILBAO-MUNGIA-BERMEO Autopista,A3527-BILBAO-MUNGIA-BERMEO Autopista,3,https://web.bizkaia.eus/eu/web/bizkaibus/detalle-de-linea?linea=A3527&numRuta=001,9CCD64,01573C,70,1,1
