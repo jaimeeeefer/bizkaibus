@@ -668,6 +668,49 @@ function haversineMetres(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.asin(Math.sqrt(a));
 }
 
+// ── Compute delay in seconds for a bus given its GPS position ──
+// prevStop/nextStop are stop_times rows; prevInfo/nextInfo are stopsData entries with coords.
+// busLat/busLon is the GPS position from the RT feed.
+// Returns delay in seconds (positive = late, negative = early).
+function computeBusDelay(prevStop, nextStop, prevInfo, nextInfo, busLat, busLon, recordedAtISO) {
+  const rt = new Date(recordedAtISO);
+  const actual = rt.getHours()*3600 + rt.getMinutes()*60 + rt.getSeconds();
+
+  const schedDep = timeToSeconds(prevStop ? (prevStop.departure_time || prevStop.arrival_time) : null);
+  const schedArr = timeToSeconds(nextStop.arrival_time || nextStop.departure_time);
+  if (schedArr <= 0) return null;
+
+  // If we have GPS + both stop coords, interpolate fraction of segment completed
+  if (prevStop && prevInfo && nextInfo && busLat !== null && busLon !== null) {
+    const segDist   = haversineMetres(prevInfo.stop_lat, prevInfo.stop_lon, nextInfo.stop_lat, nextInfo.stop_lon);
+    const distToNext = haversineMetres(busLat, busLon, nextInfo.stop_lat, nextInfo.stop_lon);
+    const segDur    = schedArr - (schedDep > 0 ? schedDep : schedArr); // seconds for this segment
+
+    if (segDist > 0 && segDur > 0) {
+      // Fraction of segment still remaining (0 = at prevStop, 1 = at nextStop)
+      const fracRemaining = Math.min(1, Math.max(0, distToNext / segDist));
+      // Estimated time the bus left prevStop = now - time_already_spent_in_segment
+      // time_spent = (1 - fracRemaining) * segDur
+      const timeSpent = (1 - fracRemaining) * segDur;
+      const estimatedActualDep = actual - timeSpent;
+      if (schedDep > 0) return estimatedActualDep - schedDep;
+      // Fallback: compare expected arrival at nextStop vs schedule
+      return (actual + fracRemaining * segDur) - schedArr;
+    }
+  }
+
+  // Fallback (no GPS or coords missing): compare recordedAt vs nextStop.arrival_time
+  // Check if bus is close to next stop using GPS vs stop coord if available
+  if (busLat !== null && busLon !== null && nextInfo) {
+    const d = haversineMetres(busLat, busLon, nextInfo.stop_lat, nextInfo.stop_lon);
+    if (d < 1000) {
+      const schedDep2 = timeToSeconds(nextStop.departure_time || nextStop.arrival_time);
+      return schedDep2 > 0 ? actual - schedDep2 : null;
+    }
+  }
+  return actual - schedArr;
+}
+
 // ═══════════════════════════════════════════════════════
 // DATA STORES
 // ═══════════════════════════════════════════════════════
@@ -1006,7 +1049,13 @@ async function buscarBusesPorParada() {
       const jref = act.querySelector('VehicleJourneyRef')?.textContent.trim();
       const spRef = act.querySelector('StopPointRef')?.textContent.trim();
       const recAt = act.querySelector('RecordedAtTime')?.textContent.trim();
-      if (jref && spRef && recAt) rtMap.set(jref, { stopPointRef: spRef, recordedAtTimeISO: recAt });
+      const busLat = parseFloat(act.querySelector('Latitude')?.textContent);
+      const busLon = parseFloat(act.querySelector('Longitude')?.textContent);
+      if (jref && spRef && recAt) rtMap.set(jref, {
+        stopPointRef: spRef, recordedAtTimeISO: recAt,
+        lat: isNaN(busLat) ? null : busLat,
+        lon: isNaN(busLon) ? null : busLon
+      });
     }
   } catch(e) { console.warn('RT fetch failed', e); }
 
@@ -1038,30 +1087,14 @@ async function buscarBusesPorParada() {
         const live = rtMap.get(st.trip_id);
         const nextStop = allStops.find(s => s.stop_id === live.stopPointRef);
         if (nextStop && live.recordedAtTimeISO) {
-          // Stable delay formula: delay = recordedAt - nextStop.arrival_time
-          // This doesn't drift between refreshes because recordedAt tracks bus position.
-          // Exception: if nextStop is very close (<500m), bus may be departing it already,
-          // so use nextStop.departure_time instead (the original behaviour).
-          const rt = new Date(live.recordedAtTimeISO);
-          const actual = rt.getHours()*3600 + rt.getMinutes()*60 + rt.getSeconds();
-          const nextStopInfo = stopsData.get(nextStop.stop_id);
-          // Also get bus GPS position from the live feed if available (not stored in rtMap yet)
-          // Fall back to checking distance using prevStop position as proxy
-          const prevStop = allStops.filter(s => s.stop_sequence < nextStop.stop_sequence)
+          const nextSeq = nextStop.stop_sequence;
+          const prevStop = allStops.filter(s => s.stop_sequence < nextSeq)
                                    .sort((a,b) => b.stop_sequence - a.stop_sequence)[0];
-          const prevStopInfo = prevStop ? stopsData.get(prevStop.stop_id) : null;
-          // Compute distance between prev and next stops as proxy for segment length
-          let useNextDep = false;
-          if (nextStopInfo && prevStopInfo) {
-            const segDist = haversineMetres(prevStopInfo.stop_lat, prevStopInfo.stop_lon,
-                                            nextStopInfo.stop_lat, nextStopInfo.stop_lon);
-            if (segDist < 500) useNextDep = true; // short segment → bus is basically at next stop
-          }
-          const schedRef = useNextDep
-            ? timeToSeconds(nextStop.departure_time || nextStop.arrival_time)
-            : timeToSeconds(nextStop.arrival_time || nextStop.departure_time);
-          if (schedRef > 0 && actual > 0) {
-            const delay = actual - schedRef;
+          const prevInfo = prevStop ? stopsData.get(prevStop.stop_id) : null;
+          const nextInfo = stopsData.get(nextStop.stop_id);
+          const delay = computeBusDelay(prevStop, nextStop, prevInfo, nextInfo,
+                                        live.lat, live.lon, live.recordedAtTimeISO);
+          if (delay !== null) {
             estSec = timeToSeconds(st.departure_time) + delay;
             const dm = Math.round(delay/60);
             if (dm > 1) delayPill = `<span class="delay-pill delay">+${dm}m</span>`;
@@ -1183,32 +1216,19 @@ async function localizarBusEnTiempoReal(targetTripId, targetVehicleRef) {
           delayEl.textContent = 'Esperando salida de cabecera';
           delayEl.style.color = '#F5A623';
         } else {
-          // spRef = NEXT stop. Stable delay: recordedAt vs nextStop.arrival_time.
-          // If segment to next stop is short (<500m), use nextStop.departure_time instead.
           const nextST = allStops.find(s => s.stop_id === spRef);
           if (nextST) {
             const prevST = allStops.filter(s => s.stop_sequence < nextST.stop_sequence)
                                    .sort((a,b) => b.stop_sequence - a.stop_sequence)[0];
-            const nextInfo = stopsData.get(nextST.stop_id);
             const prevInfo = prevST ? stopsData.get(prevST.stop_id) : null;
-            let useNextDep = false;
-            if (nextInfo && prevInfo) {
-              const segDist = haversineMetres(prevInfo.stop_lat, prevInfo.stop_lon,
-                                              nextInfo.stop_lat, nextInfo.stop_lon);
-              if (segDist < 500) useNextDep = true;
-            }
-            const sched = useNextDep
-              ? timeToSeconds(nextST.departure_time || nextST.arrival_time)
-              : timeToSeconds(nextST.arrival_time || nextST.departure_time);
-            const rt = new Date(recAt);
-            const actual = rt.getHours()*3600+rt.getMinutes()*60+rt.getSeconds();
-            if (sched > 0 && actual > 0) {
-              currentBusDelayInSeconds = actual - sched;
-              const dm = Math.round(currentBusDelayInSeconds/60);
-              if (currentBusDelayInSeconds > 60) { delayEl.textContent = `Retraso estimado: ${dm} min`; delayEl.style.color='#D0021B'; }
-              else if (currentBusDelayInSeconds < -60) { delayEl.textContent = `Adelanto: ${Math.abs(dm)} min`; delayEl.style.color='var(--green)'; }
-              else { delayEl.textContent = 'En hora'; delayEl.style.color='var(--green)'; }
-            }
+            const nextInfo = stopsData.get(nextST.stop_id);
+            const busLat = isNaN(lat) ? null : lat;
+            const busLon = isNaN(lon) ? null : lon;
+            currentBusDelayInSeconds = computeBusDelay(prevST, nextST, prevInfo, nextInfo, busLat, busLon, recAt) ?? 0;
+            const dm = Math.round(currentBusDelayInSeconds/60);
+            if (currentBusDelayInSeconds > 60) { delayEl.textContent = `Retraso estimado: ${dm} min`; delayEl.style.color='#D0021B'; }
+            else if (currentBusDelayInSeconds < -60) { delayEl.textContent = `Adelanto: ${Math.abs(dm)} min`; delayEl.style.color='var(--green)'; }
+            else { delayEl.textContent = 'En hora'; delayEl.style.color='var(--green)'; }
           }
         }
       }
