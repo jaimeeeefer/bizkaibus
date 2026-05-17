@@ -142,13 +142,14 @@
     .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
 
     #polling-toggle {
-      display: flex; align-items: center; gap: 7px;
+      display: flex; align-items: center; gap: 6px;
       font-size: 0.8rem; color: var(--ink-soft); cursor: pointer;
     }
     .toggle-pill {
       width: 36px; height: 20px; border-radius: 10px;
       background: var(--border); position: relative;
-      transition: background 0.25s;
+      flex-shrink: 0;
+      transition: background 0.25s; overflow: hidden;
     }
     .toggle-pill::after {
       content: ''; position: absolute;
@@ -161,6 +162,7 @@
     .toggle-pill.on::after { left: 18px; }
 
     #polling-countdown { font-size: 0.75rem; color: var(--ink-soft); min-width: 2ch; }
+    #polling-label { white-space: nowrap; }
 
     .btn-icon {
       width: 32px; height: 32px; border-radius: 8px; border: none;
@@ -327,7 +329,7 @@
       border-radius: 12px; padding: 14px;
       margin-bottom: 12px;
     }
-    .route-header .line-id { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1.2rem; }
+    .route-header .line-id { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.2rem; }
     .route-header .headsign { font-size: 0.85rem; color: rgba(255,255,255,.7); margin-top: 3px; }
     .route-header .delay-info { margin-top: 8px; font-size: 0.85rem; font-weight: 500; }
 
@@ -403,10 +405,15 @@
       #map-container { height: 55vw; min-height: 260px; flex: none; }
       #mobile-toggle { display: flex; }
 
-      #results-panel { max-height: 340px; overflow-y: auto; }
+      /* Show only 2-3 buses on mobile to leave space for map */
+      #results-panel { max-height: 210px; overflow-y: auto; }
       #favs-section { position: static; }
 
       body { overflow-y: auto; }
+
+      /* Toggle: hide label text, keep pill + countdown tight */
+      #polling-label { display: none; }
+      #polling-toggle { gap: 4px; }
     }
 
     /* ─── SCROLLBAR ─────────────────────────────────── */
@@ -1022,11 +1029,17 @@ async function buscarBusesPorParada() {
         const live = rtMap.get(st.trip_id);
         const liveStop = allStops.find(s => s.stop_id === live.stopPointRef);
         if (liveStop && live.recordedAtTimeISO) {
-          const sched = timeToSeconds(liveStop.arrival_time);
           const rt = new Date(live.recordedAtTimeISO);
           const actual = rt.getHours()*3600 + rt.getMinutes()*60 + rt.getSeconds();
-          if (sched > 0 && actual > 0) {
-            const delay = actual - sched;
+          // Use the last stop the bus has PASSED (RT stop or previous) to compute delay
+          // rather than comparing current wall-clock time to RT stop's scheduled arrival.
+          // Find the last stop with stop_sequence <= liveStop.stop_sequence that has been passed.
+          const liveSeq = liveStop.stop_sequence;
+          // The RT feed gives us the time the bus was recorded AT liveStop.
+          // Compare that recorded time vs scheduled departure of liveStop to get the delay.
+          const schedRef = timeToSeconds(liveStop.departure_time || liveStop.arrival_time);
+          if (schedRef > 0 && actual > 0) {
+            const delay = actual - schedRef;
             estSec = timeToSeconds(st.departure_time) + delay;
             const dm = Math.round(delay/60);
             if (dm > 1) delayPill = `<span class="delay-pill delay">+${dm}m</span>`;
@@ -1149,7 +1162,8 @@ async function localizarBusEnTiempoReal(targetTripId, targetVehicleRef) {
         } else {
           const tripST = allStops.find(s => s.stop_id === spRef);
           if (tripST) {
-            const sched = timeToSeconds(tripST.arrival_time);
+            // Use scheduled departure (not arrival) of the last known stop for delay calc
+            const sched = timeToSeconds(tripST.departure_time || tripST.arrival_time);
             const rt = new Date(recAt);
             const actual = rt.getHours()*3600+rt.getMinutes()*60+rt.getSeconds();
             if (sched > 0 && actual > 0) {
