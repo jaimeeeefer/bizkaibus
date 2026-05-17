@@ -329,7 +329,7 @@
       border-radius: 12px; padding: 14px;
       margin-bottom: 12px;
     }
-    .route-header .line-id { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.2rem; }
+    .route-header .line-id { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1.2rem; }
     .route-header .headsign { font-size: 0.85rem; color: rgba(255,255,255,.7); margin-top: 3px; }
     .route-header .delay-info { margin-top: 8px; font-size: 0.85rem; font-weight: 500; }
 
@@ -393,27 +393,27 @@
     @media (max-width: 768px) {
       :root { --sidebar-w: 100vw; }
 
-      body { overflow: auto; }
-      #layout { flex-direction: column; overflow: auto; }
+      html, body { height: 100%; overflow: hidden; }
+      #layout { flex-direction: column; overflow: hidden; flex: 1; }
 
       #sidebar {
         width: 100%; border-right: none;
         border-bottom: 1px solid var(--border);
-        overflow: visible;
+        overflow: visible; flex-shrink: 0;
       }
 
-      #map-container { height: 55vw; min-height: 260px; flex: none; }
+      /* Map fills remaining screen height exactly */
+      #map-container { flex: 1; min-height: 0; height: auto; }
+
       #mobile-toggle { display: flex; }
 
-      /* Show only 2-3 buses on mobile to leave space for map */
-      #results-panel { max-height: 210px; overflow-y: auto; }
+      /* ~3 bus cards */
+      #results-panel { max-height: 250px; overflow-y: auto; }
       #favs-section { position: static; }
 
-      body { overflow-y: auto; }
-
-      /* Toggle: hide label text, keep pill + countdown tight */
-      #polling-label { display: none; }
-      #polling-toggle { gap: 4px; }
+      /* Keep toggle label visible but compact */
+      #polling-label { display: inline; }
+      #polling-toggle { gap: 5px; font-size: 0.75rem; }
     }
 
     /* ─── SCROLLBAR ─────────────────────────────────── */
@@ -1027,17 +1027,18 @@ async function buscarBusesPorParada() {
         delayPill = `<span class="delay-pill on-time">● En hora</span>`;
       } else {
         const live = rtMap.get(st.trip_id);
-        const liveStop = allStops.find(s => s.stop_id === live.stopPointRef);
-        if (liveStop && live.recordedAtTimeISO) {
+        const nextStop = allStops.find(s => s.stop_id === live.stopPointRef);
+        if (nextStop && live.recordedAtTimeISO) {
+          // stopPointRef is the NEXT stop the bus is heading to.
+          // To get the real delay we compare recordedAt vs the departure_time of the
+          // PREVIOUS stop (the last one the bus actually left).
+          const nextSeq = nextStop.stop_sequence;
+          const prevStop = allStops.filter(s => s.stop_sequence < nextSeq)
+                                   .sort((a,b) => b.stop_sequence - a.stop_sequence)[0];
+          const refStop = prevStop || nextStop; // fallback to nextStop if bus is at origin
+          const schedRef = timeToSeconds(refStop.departure_time || refStop.arrival_time);
           const rt = new Date(live.recordedAtTimeISO);
           const actual = rt.getHours()*3600 + rt.getMinutes()*60 + rt.getSeconds();
-          // Use the last stop the bus has PASSED (RT stop or previous) to compute delay
-          // rather than comparing current wall-clock time to RT stop's scheduled arrival.
-          // Find the last stop with stop_sequence <= liveStop.stop_sequence that has been passed.
-          const liveSeq = liveStop.stop_sequence;
-          // The RT feed gives us the time the bus was recorded AT liveStop.
-          // Compare that recorded time vs scheduled departure of liveStop to get the delay.
-          const schedRef = timeToSeconds(liveStop.departure_time || liveStop.arrival_time);
           if (schedRef > 0 && actual > 0) {
             const delay = actual - schedRef;
             estSec = timeToSeconds(st.departure_time) + delay;
@@ -1160,10 +1161,14 @@ async function localizarBusEnTiempoReal(targetTripId, targetVehicleRef) {
           delayEl.textContent = 'Esperando salida de cabecera';
           delayEl.style.color = '#F5A623';
         } else {
-          const tripST = allStops.find(s => s.stop_id === spRef);
-          if (tripST) {
-            // Use scheduled departure (not arrival) of the last known stop for delay calc
-            const sched = timeToSeconds(tripST.departure_time || tripST.arrival_time);
+          // spRef = NEXT stop. Find the previous (last departed) stop for accurate delay.
+          const nextST = allStops.find(s => s.stop_id === spRef);
+          if (nextST) {
+            const nextSeq = nextST.stop_sequence;
+            const prevST = allStops.filter(s => s.stop_sequence < nextSeq)
+                                   .sort((a,b) => b.stop_sequence - a.stop_sequence)[0];
+            const refST = prevST || nextST; // fallback if bus hasn't left origin yet
+            const sched = timeToSeconds(refST.departure_time || refST.arrival_time);
             const rt = new Date(recAt);
             const actual = rt.getHours()*3600+rt.getMinutes()*60+rt.getSeconds();
             if (sched > 0 && actual > 0) {
