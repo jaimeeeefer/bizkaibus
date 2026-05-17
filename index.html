@@ -10,9 +10,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Nunito:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&display=swap" rel="stylesheet">
   <style>
     :root {
-      --red: #E8352A;
-      --red-dark: #C0291F;
-      --red-light: #FF5A50;
+      --red: #00873D;
+      --red-dark: #006B31;
+      --red-light: #1FAF5A;
       --ink: #111318;
       --ink-mid: #2C2F38;
       --ink-soft: #4A4E5A;
@@ -289,12 +289,11 @@
     .bus-card-top { display: flex; align-items: center; gap: 8px; }
     .bus-badge {
       background: var(--red); color: white;
-      font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.78rem;
-      padding: 3px 8px; border-radius: 6px; flex-shrink: 0;
+      font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.78rem;padding: 3px 8px; border-radius: 6px; flex-shrink: 0;
     }
     .bus-card-dest { font-weight: 500; font-size: 0.88rem; flex: 1; }
     .bus-card-time {
-      font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1rem;
+      font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 1rem;
       color: var(--ink); flex-shrink: 0;
     }
 
@@ -305,7 +304,7 @@
       border-radius: 20px; display: inline-flex; align-items: center;
     }
     .delay-pill.on-time { background: #E6F7EE; color: var(--green); }
-    .delay-pill.delay    { background: #FDECEA; color: var(--red); }
+    .delay-pill.delay    { background: #FDECEA; color: #D0021B; }
     .delay-pill.advance  { background: #E6F7EE; color: var(--green); }
 
     /* Real-time bus markers in line search */
@@ -315,8 +314,8 @@
       cursor: pointer; display: flex; align-items: center; gap: 10px;
       transition: all 0.15s;
     }
-    .bus-list-item:hover { border-color: var(--red); background: #FFF5F5; }
-    .bus-list-item .badge { background: var(--red); color: white; border-radius: 6px; padding: 3px 8px; font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.78rem; }
+    .bus-list-item:hover { border-color: var(--red); background: #F0FAF4; }
+    .bus-list-item .badge { background: var(--red); color: white; border-radius: 6px; padding: 3px 8px; font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.78rem; }
     .bus-list-item-info { flex: 1; }
     .bus-list-item-info .main { font-weight: 500; font-size: 0.88rem; }
     .bus-list-item-info .sub { font-size: 0.76rem; color: var(--ink-soft); margin-top: 2px; }
@@ -377,7 +376,7 @@
       cursor: pointer; transition: all 0.15s; font-family: 'Nunito', sans-serif;
       white-space: nowrap;
     }
-    .btn-add-fav:hover { border-color: var(--red); color: var(--red); background: #FFF5F5; }
+    .btn-add-fav:hover { border-color: var(--red); color: var(--red); background: #F0FAF4; }
     .btn-add-fav.saved {
       border-style: solid; border-color: var(--green);
       color: var(--green); background: #E6F7EE; cursor: default;
@@ -1156,7 +1155,7 @@ async function localizarBusEnTiempoReal(targetTripId, targetVehicleRef) {
             if (sched > 0 && actual > 0) {
               currentBusDelayInSeconds = actual - sched;
               const dm = Math.round(currentBusDelayInSeconds/60);
-              if (currentBusDelayInSeconds > 60) { delayEl.textContent = `Retraso estimado: ${dm} min`; delayEl.style.color='var(--red)'; }
+              if (currentBusDelayInSeconds > 60) { delayEl.textContent = `Retraso estimado: ${dm} min`; delayEl.style.color='#D0021B'; }
               else if (currentBusDelayInSeconds < -60) { delayEl.textContent = `Adelanto: ${Math.abs(dm)} min`; delayEl.style.color='var(--green)'; }
               else { delayEl.textContent = 'En hora'; delayEl.style.color='var(--green)'; }
             }
@@ -1281,9 +1280,16 @@ function saveFavs(favs) { localStorage.setItem('bizkaibus_favs', JSON.stringify(
 
 function addFavoriteStop() {
   const btn = document.getElementById('btn-fav-stop');
-  if (!currentStopId || btn.classList.contains('saved')) return;
-  const name = getCleanStopName(currentStopId);
+  if (!currentStopId) return;
   const favs = getFavs();
+  if (btn.classList.contains('saved')) {
+    const idx = favs.findIndex(f => f.type==='stop' && f.id===currentStopId);
+    if (idx !== -1) { favs.splice(idx, 1); saveFavs(favs); updateFavsUI(); }
+    btn.textContent = '⭐ Guardar parada';
+    btn.classList.remove('saved');
+    return;
+  }
+  const name = getCleanStopName(currentStopId);
   if (!favs.find(f => f.type==='stop' && f.id===currentStopId)) {
     favs.push({ type:'stop', id: currentStopId, label: `🚏 ${name} (${currentStopId})` });
     saveFavs(favs);
@@ -1295,8 +1301,15 @@ function addFavoriteStop() {
 
 function addFavoriteLine() {
   const btn = document.getElementById('btn-fav-linea');
-  if (!lastLineSearch || btn.classList.contains('saved')) return;
+  if (!lastLineSearch) return;
   const favs = getFavs();
+  if (btn.classList.contains('saved')) {
+    const idx = favs.findIndex(f => f.type==='line' && f.id===lastLineSearch);
+    if (idx !== -1) { favs.splice(idx, 1); saveFavs(favs); updateFavsUI(); }
+    btn.textContent = '⭐ Guardar línea';
+    btn.classList.remove('saved');
+    return;
+  }
   if (!favs.find(f => f.type==='line' && f.id===lastLineSearch)) {
     favs.push({ type:'line', id: lastLineSearch, label: `🚌 Línea ${lastLineSearch}` });
     saveFavs(favs);
