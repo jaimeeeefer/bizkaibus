@@ -1197,13 +1197,13 @@ async function localizarBusEnTiempoReal(targetTripId, targetVehicleRef) {
       const destinoDisplay = jref && tripsData.has(jref) ? tripsData.get(jref).trip_headsign : 'N/A';
 
       realTimeBusMarker = L.marker([lat,lon],{icon:busIcon}).addTo(map);
-      const popupMaxW = Math.min(260, Math.round(map.getContainer().offsetWidth * 0.82));
+      const popupMaxW = Math.min(220, Math.round(map.getContainer().offsetWidth * 0.75));
       realTimeBusMarker.bindPopup(`
         <b>🚌 Bus en tiempo real</b><br>
-        <b>Línea:</b> <a href="#" onclick="rellenarYBuscarLinea('${lineaDisplay}');return false">${lineaDisplay}</a><br>
-        <b>Destino:</b> ${destinoDisplay}<br>
+        <b>Línea:</b> <a href="#" onclick="rellenarYBuscarLinea('${lineaDisplay}');return false">${lineaDisplay}</a> · <b>Destino:</b> ${destinoDisplay}<br>
         <b>Parada:</b> <a href="#" onclick="rellenarYBuscarParada('${spRef}','${paradaNom}');return false">${paradaNom} (${spRef})</a><br>
-        <b>Bus nº:</b> ${vref} | <b>Matrícula:</b> ${infoBus.matricula}
+        <b>Bus nº:</b> ${vref} · <b>Matrícula:</b> ${infoBus.matricula}<br>
+        <b>Modelo:</b> ${infoBus.modelo}
       `, { maxWidth: popupMaxW }).openPopup();
 
       if (recAt && spRef && jref) {
