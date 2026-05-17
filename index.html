@@ -208,22 +208,25 @@
     .tab-btn.active { background: var(--white); color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
 
     .search-input-wrap {
-      position: relative; display: none;
+      display: none;
     }
     .search-input-wrap.active { display: block; }
 
-    .search-input-wrap input {
-      width: 100%; padding: 0.65rem 0.9rem 0.65rem 2.2rem;
+    .search-input-row {
+      position: relative;
+    }
+    .search-input-row input {
+      width: 100%; padding: 0.65rem 0.9rem 0.65rem 2.1rem;
       border: 1.5px solid var(--border); border-radius: 10px;
       font-size: 0.9rem; font-family: 'Nunito', sans-serif;
       outline: none; background: var(--surface);
       transition: border-color 0.2s, background 0.2s;
+      line-height: 1.4;
     }
-    .search-input-wrap input:focus { border-color: var(--red); background: var(--white); }
-    .search-input-wrap .search-icon {
+    .search-input-row input:focus { border-color: var(--red); background: var(--white); }
+    .search-input-row .search-icon {
       position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
-      color: var(--ink-soft); font-size: 0.95rem; pointer-events: none;
-      line-height: 1;
+      font-size: 0.9rem; pointer-events: none; line-height: 1;
     }
 
     .search-btn {
@@ -368,12 +371,18 @@
     .fav-del:hover { color: var(--red); }
     .btn-add-fav {
       display: none; /* shown contextually */
-      width: 100%; margin-top: 8px; padding: 7px;
+      padding: 5px 10px;
       background: var(--surface); border: 1.5px dashed var(--border);
-      border-radius: 8px; font-size: 0.82rem; color: var(--ink-soft);
+      border-radius: 8px; font-size: 0.8rem; color: var(--ink-soft);
       cursor: pointer; transition: all 0.15s; font-family: 'Nunito', sans-serif;
+      white-space: nowrap;
     }
     .btn-add-fav:hover { border-color: var(--red); color: var(--red); background: #FFF5F5; }
+    .btn-add-fav.saved {
+      border-style: solid; border-color: var(--green);
+      color: var(--green); background: #E6F7EE; cursor: default;
+    }
+    .btn-add-fav.saved:hover { border-color: var(--green); color: var(--green); background: #E6F7EE; }
 
     /* ─── MAP ───────────────────────────────────────── */
     #map-container { flex: 1; position: relative; overflow: hidden; }
@@ -490,26 +499,31 @@
 
       <!-- Tab: Línea -->
       <div class="search-input-wrap active" id="wrap-linea">
-        <input type="text" id="linea" placeholder="Ej: A3935 o 3935" />
-        <span class="search-icon">🔍</span>
+        <div class="search-input-row">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="linea" placeholder="Ej: A3935 o 3935" />
+        </div>
         <button class="search-btn" onclick="buscarBusesPorLinea()">Ver buses en mapa</button>
       </div>
 
       <!-- Tab: Parada -->
-      <div class="search-input-wrap" id="wrap-parada" style="position:relative">
-        <input type="text" id="parada-nombre" placeholder="Nombre o nº de parada…"
-               oninput="onParadaInput()" onblur="setTimeout(()=>closeAutocomplete(),200)" />
-        <span class="search-icon">🔍</span>
-        <div id="stop-autocomplete"></div>
+      <div class="search-input-wrap" id="wrap-parada">
+        <div class="search-input-row" style="position:relative">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="parada-nombre" placeholder="Nombre o nº de parada…"
+                 oninput="onParadaInput()" onblur="setTimeout(()=>closeAutocomplete(),200)" />
+          <div id="stop-autocomplete"></div>
+        </div>
         <button class="search-btn" onclick="buscarBusesPorParada()">Ver próximos buses</button>
-        <!-- Hidden real stop id -->
         <input type="hidden" id="parada" />
       </div>
 
       <!-- Tab: Bus nº -->
       <div class="search-input-wrap" id="wrap-bus">
-        <input type="text" id="numBus" placeholder="Ej: 1514" />
-        <span class="search-icon">🚌</span>
+        <div class="search-input-row">
+          <span class="search-icon">🚌</span>
+          <input type="text" id="numBus" placeholder="Ej: 1514" />
+        </div>
         <button class="search-btn" onclick="buscarBusPorNumero()">Localizar bus</button>
       </div>
     </div>
@@ -846,8 +860,15 @@ function showPanel(name) {
   document.getElementById('stop-results').style.display = name === 'stop' ? 'block' : 'none';
   document.getElementById('line-results').style.display = name === 'line' ? 'block' : 'none';
   document.getElementById('route-details-panel').style.display = name === 'route' ? 'block' : 'none';
-  document.getElementById('btn-fav-stop').style.display = name === 'stop' ? 'block' : 'none';
-  document.getElementById('btn-fav-linea').style.display = name === 'line' ? 'block' : 'none';
+
+  // Reset and show fav buttons
+  const btnStop = document.getElementById('btn-fav-stop');
+  const btnLine = document.getElementById('btn-fav-linea');
+  btnStop.style.display = name === 'stop' ? 'inline-block' : 'none';
+  btnLine.style.display = name === 'line' ? 'inline-block' : 'none';
+  // Reset saved state when doing a new search
+  if (name === 'stop') { btnStop.textContent = '⭐ Guardar parada'; btnStop.classList.remove('saved'); }
+  if (name === 'line') { btnLine.textContent = '⭐ Guardar línea'; btnLine.classList.remove('saved'); }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -948,6 +969,12 @@ async function buscarBusesPorParada() {
 
   clearLineMarkers(); clearMapElements();
   showPanel('stop');
+  // If already a favourite, show saved state immediately
+  if (getFavs().find(f => f.type==='stop' && f.id===stopId)) {
+    const btn = document.getElementById('btn-fav-stop');
+    btn.textContent = '✓ Parada guardada';
+    btn.classList.add('saved');
+  }
   const stopName = getCleanStopName(stopId);
   document.getElementById('stop-results-title').textContent = `${stopName}`;
   document.getElementById('bus-list').innerHTML = '<div class="empty-state"><div class="spinner" style="margin:0 auto"></div></div>';
@@ -1253,22 +1280,30 @@ function getFavs() { return JSON.parse(localStorage.getItem('bizkaibus_favs') ||
 function saveFavs(favs) { localStorage.setItem('bizkaibus_favs', JSON.stringify(favs)); }
 
 function addFavoriteStop() {
-  if (!currentStopId) return;
+  const btn = document.getElementById('btn-fav-stop');
+  if (!currentStopId || btn.classList.contains('saved')) return;
   const name = getCleanStopName(currentStopId);
   const favs = getFavs();
-  if (favs.find(f => f.type==='stop' && f.id===currentStopId)) return;
-  favs.push({ type:'stop', id: currentStopId, label: `🚏 ${name} (${currentStopId})` });
-  saveFavs(favs);
-  updateFavsUI();
+  if (!favs.find(f => f.type==='stop' && f.id===currentStopId)) {
+    favs.push({ type:'stop', id: currentStopId, label: `🚏 ${name} (${currentStopId})` });
+    saveFavs(favs);
+    updateFavsUI();
+  }
+  btn.textContent = '✓ Parada guardada';
+  btn.classList.add('saved');
 }
 
 function addFavoriteLine() {
-  if (!lastLineSearch) return;
+  const btn = document.getElementById('btn-fav-linea');
+  if (!lastLineSearch || btn.classList.contains('saved')) return;
   const favs = getFavs();
-  if (favs.find(f => f.type==='line' && f.id===lastLineSearch)) return;
-  favs.push({ type:'line', id: lastLineSearch, label: `🚌 Línea ${lastLineSearch}` });
-  saveFavs(favs);
-  updateFavsUI();
+  if (!favs.find(f => f.type==='line' && f.id===lastLineSearch)) {
+    favs.push({ type:'line', id: lastLineSearch, label: `🚌 Línea ${lastLineSearch}` });
+    saveFavs(favs);
+    updateFavsUI();
+  }
+  btn.textContent = '✓ Línea guardada';
+  btn.classList.add('saved');
 }
 
 function removeFav(idx) {
