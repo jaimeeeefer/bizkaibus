@@ -659,6 +659,15 @@ let markers = [], stopMarkers = [], linePolylines = [], realTimeBusMarker = null
 let currentBusDelayInSeconds = null, currentBusStopIdRealTime = null;
 const COLORS = ['#E8352A','#1565C0','#2E7D32','#E65100','#6A1B9A'];
 
+// ── Haversine distance in metres between two lat/lon points ──
+function haversineMetres(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.asin(Math.sqrt(a));
+}
+
 // ═══════════════════════════════════════════════════════
 // DATA STORES
 // ═══════════════════════════════════════════════════════
@@ -1029,16 +1038,28 @@ async function buscarBusesPorParada() {
         const live = rtMap.get(st.trip_id);
         const nextStop = allStops.find(s => s.stop_id === live.stopPointRef);
         if (nextStop && live.recordedAtTimeISO) {
-          // stopPointRef is the NEXT stop the bus is heading to.
-          // To get the real delay we compare recordedAt vs the departure_time of the
-          // PREVIOUS stop (the last one the bus actually left).
-          const nextSeq = nextStop.stop_sequence;
-          const prevStop = allStops.filter(s => s.stop_sequence < nextSeq)
-                                   .sort((a,b) => b.stop_sequence - a.stop_sequence)[0];
-          const refStop = prevStop || nextStop; // fallback to nextStop if bus is at origin
-          const schedRef = timeToSeconds(refStop.departure_time || refStop.arrival_time);
+          // Stable delay formula: delay = recordedAt - nextStop.arrival_time
+          // This doesn't drift between refreshes because recordedAt tracks bus position.
+          // Exception: if nextStop is very close (<500m), bus may be departing it already,
+          // so use nextStop.departure_time instead (the original behaviour).
           const rt = new Date(live.recordedAtTimeISO);
           const actual = rt.getHours()*3600 + rt.getMinutes()*60 + rt.getSeconds();
+          const nextStopInfo = stopsData.get(nextStop.stop_id);
+          // Also get bus GPS position from the live feed if available (not stored in rtMap yet)
+          // Fall back to checking distance using prevStop position as proxy
+          const prevStop = allStops.filter(s => s.stop_sequence < nextStop.stop_sequence)
+                                   .sort((a,b) => b.stop_sequence - a.stop_sequence)[0];
+          const prevStopInfo = prevStop ? stopsData.get(prevStop.stop_id) : null;
+          // Compute distance between prev and next stops as proxy for segment length
+          let useNextDep = false;
+          if (nextStopInfo && prevStopInfo) {
+            const segDist = haversineMetres(prevStopInfo.stop_lat, prevStopInfo.stop_lon,
+                                            nextStopInfo.stop_lat, nextStopInfo.stop_lon);
+            if (segDist < 500) useNextDep = true; // short segment → bus is basically at next stop
+          }
+          const schedRef = useNextDep
+            ? timeToSeconds(nextStop.departure_time || nextStop.arrival_time)
+            : timeToSeconds(nextStop.arrival_time || nextStop.departure_time);
           if (schedRef > 0 && actual > 0) {
             const delay = actual - schedRef;
             estSec = timeToSeconds(st.departure_time) + delay;
@@ -1143,13 +1164,14 @@ async function localizarBusEnTiempoReal(targetTripId, targetVehicleRef) {
       const destinoDisplay = jref && tripsData.has(jref) ? tripsData.get(jref).trip_headsign : 'N/A';
 
       realTimeBusMarker = L.marker([lat,lon],{icon:busIcon}).addTo(map);
+      const popupMaxW = Math.min(260, Math.round(map.getContainer().offsetWidth * 0.82));
       realTimeBusMarker.bindPopup(`
         <b>🚌 Bus en tiempo real</b><br>
         <b>Línea:</b> <a href="#" onclick="rellenarYBuscarLinea('${lineaDisplay}');return false">${lineaDisplay}</a><br>
         <b>Destino:</b> ${destinoDisplay}<br>
         <b>Parada:</b> <a href="#" onclick="rellenarYBuscarParada('${spRef}','${paradaNom}');return false">${paradaNom} (${spRef})</a><br>
         <b>Bus nº:</b> ${vref} | <b>Matrícula:</b> ${infoBus.matricula}
-      `).openPopup();
+      `, { maxWidth: popupMaxW }).openPopup();
 
       if (recAt && spRef && jref) {
         const allStops = stopTimesData.filter(s=>s.trip_id===jref).sort((a,b)=>a.stop_sequence-b.stop_sequence);
@@ -1161,14 +1183,23 @@ async function localizarBusEnTiempoReal(targetTripId, targetVehicleRef) {
           delayEl.textContent = 'Esperando salida de cabecera';
           delayEl.style.color = '#F5A623';
         } else {
-          // spRef = NEXT stop. Find the previous (last departed) stop for accurate delay.
+          // spRef = NEXT stop. Stable delay: recordedAt vs nextStop.arrival_time.
+          // If segment to next stop is short (<500m), use nextStop.departure_time instead.
           const nextST = allStops.find(s => s.stop_id === spRef);
           if (nextST) {
-            const nextSeq = nextST.stop_sequence;
-            const prevST = allStops.filter(s => s.stop_sequence < nextSeq)
+            const prevST = allStops.filter(s => s.stop_sequence < nextST.stop_sequence)
                                    .sort((a,b) => b.stop_sequence - a.stop_sequence)[0];
-            const refST = prevST || nextST; // fallback if bus hasn't left origin yet
-            const sched = timeToSeconds(refST.departure_time || refST.arrival_time);
+            const nextInfo = stopsData.get(nextST.stop_id);
+            const prevInfo = prevST ? stopsData.get(prevST.stop_id) : null;
+            let useNextDep = false;
+            if (nextInfo && prevInfo) {
+              const segDist = haversineMetres(prevInfo.stop_lat, prevInfo.stop_lon,
+                                              nextInfo.stop_lat, nextInfo.stop_lon);
+              if (segDist < 500) useNextDep = true;
+            }
+            const sched = useNextDep
+              ? timeToSeconds(nextST.departure_time || nextST.arrival_time)
+              : timeToSeconds(nextST.arrival_time || nextST.departure_time);
             const rt = new Date(recAt);
             const actual = rt.getHours()*3600+rt.getMinutes()*60+rt.getSeconds();
             if (sched > 0 && actual > 0) {
