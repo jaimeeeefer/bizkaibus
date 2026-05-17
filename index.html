@@ -610,6 +610,7 @@ const STOPS_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/
 const STOP_TIMES1_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/stop_times1.txt";
 const STOP_TIMES2_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/stop_times2.txt";
 const STOP_TIMES3_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/stop_times3.txt";
+const STOP_TIMES4_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/stop_times4.txt";
 const TRIPS_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/trips.txt";
 const CALENDAR_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/calendar.txt";
 const CALENDAR_DATES_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/calendar_dates.txt";
@@ -729,7 +730,8 @@ async function cargarDatosGTFS() {
   const texts = await Promise.all([
     fetch(STOP_TIMES1_URL).then(r=>r.text()),
     fetch(STOP_TIMES2_URL).then(r=>r.text()),
-    fetch(STOP_TIMES3_URL).then(r=>r.text())
+    fetch(STOP_TIMES3_URL).then(r=>r.text()),
+    fetch(STOP_TIMES4_URL).then(r=>r.text())
   ]);
   texts.forEach(txt => {
     txt.trim().split('\n').slice(1).forEach(line => {
