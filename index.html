@@ -7,7 +7,7 @@
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Nunito:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&display=swap" rel="stylesheet">
   <style>
     :root {
       --red: #E8352A;
@@ -28,7 +28,7 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'DM Sans', sans-serif;
+      font-family: 'Nunito', sans-serif;
       background: var(--surface);
       color: var(--ink);
       height: 100dvh;
@@ -80,7 +80,7 @@
       width: 100%; padding: 0.75rem 1rem;
       border: 1.5px solid var(--border);
       border-radius: 10px;
-      font-size: 0.95rem; font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem; font-family: 'Nunito', sans-serif;
       transition: border-color 0.2s;
       outline: none; background: var(--surface);
     }
@@ -202,7 +202,7 @@
     }
     .tab-btn {
       flex: 1; padding: 7px 4px; border: none; background: transparent;
-      border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 500;
+      border-radius: 8px; font-family: 'Nunito', sans-serif; font-size: 0.8rem; font-weight: 500;
       cursor: pointer; color: var(--ink-soft); transition: all 0.2s;
     }
     .tab-btn.active { background: var(--white); color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
@@ -213,16 +213,17 @@
     .search-input-wrap.active { display: block; }
 
     .search-input-wrap input {
-      width: 100%; padding: 0.65rem 2.5rem 0.65rem 0.9rem;
+      width: 100%; padding: 0.65rem 0.9rem 0.65rem 2.2rem;
       border: 1.5px solid var(--border); border-radius: 10px;
-      font-size: 0.9rem; font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem; font-family: 'Nunito', sans-serif;
       outline: none; background: var(--surface);
       transition: border-color 0.2s, background 0.2s;
     }
     .search-input-wrap input:focus { border-color: var(--red); background: var(--white); }
     .search-input-wrap .search-icon {
-      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-      color: var(--ink-soft); font-size: 1rem; pointer-events: none;
+      position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
+      color: var(--ink-soft); font-size: 0.95rem; pointer-events: none;
+      line-height: 1;
     }
 
     .search-btn {
@@ -263,7 +264,7 @@
       display: flex; align-items: center; justify-content: space-between;
     }
     .panel-heading small {
-      font-family: 'DM Sans', sans-serif; font-weight: 400; font-size: 0.75rem;
+      font-family: 'Nunito', sans-serif; font-weight: 400; font-size: 0.75rem;
       color: var(--ink-soft);
     }
 
@@ -370,7 +371,7 @@
       width: 100%; margin-top: 8px; padding: 7px;
       background: var(--surface); border: 1.5px dashed var(--border);
       border-radius: 8px; font-size: 0.82rem; color: var(--ink-soft);
-      cursor: pointer; transition: all 0.15s; font-family: 'DM Sans', sans-serif;
+      cursor: pointer; transition: all 0.15s; font-family: 'Nunito', sans-serif;
     }
     .btn-add-fav:hover { border-color: var(--red); color: var(--red); background: #FFF5F5; }
 
@@ -405,7 +406,7 @@
     #results-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
     /* ─── MISC ──────────────────────────────────────── */
-    .leaflet-popup-content-wrapper { border-radius: 12px !important; font-family: 'DM Sans', sans-serif; font-size: 0.88rem; }
+    .leaflet-popup-content-wrapper { border-radius: 12px !important; font-family: 'Nunito', sans-serif; font-size: 0.88rem; }
     .leaflet-popup-content b { font-family: 'Syne', sans-serif; }
 
     .chip {
@@ -465,8 +466,8 @@
   <div class="topbar-right">
     <label id="polling-toggle" title="Actualización automática">
       <div class="toggle-pill on" id="poll-pill"></div>
-      <span style="display:none" id="polling-label">Auto</span>
-      <span id="polling-countdown">30s</span>
+      <span id="polling-label">Actualización automática</span>
+      <span id="polling-countdown">60s</span>
       <input type="checkbox" checked style="display:none" id="poll-check" onchange="togglePolling()">
     </label>
     <button class="btn-icon" id="mobile-toggle" onclick="toggleSidebar()" title="Menú">☰</button>
@@ -929,10 +930,21 @@ async function buscarBusesPorLinea() {
 let currentStopId = null;
 
 async function buscarBusesPorParada() {
-  const stopId = document.getElementById('parada').value.trim() || selectedStopId;
-  if (!stopId) return alert('Selecciona una parada.');
+  // Resolve stopId: prefer the hidden field (set by our autocomplete),
+  // then try matching the visible text against the index (handles browser autofill)
+  let stopId = document.getElementById('parada').value.trim() || selectedStopId;
+  if (!stopId) {
+    const q = document.getElementById('parada-nombre').value.trim().toLowerCase();
+    if (q) {
+      // Try exact ID match first, then name match
+      const match = stopsSearchIndex.find(s => s.id === q || s.nameLower === q) ||
+                    stopsSearchIndex.find(s => s.nameLower.includes(q) || s.id.includes(q));
+      if (match) { stopId = match.id; selectStop(match.id, match.name); }
+    }
+  }
+  if (!stopId) return alert('Selecciona una parada de la lista de sugerencias.');
   if (!stopsData.has(stopId)) return alert('Parada no encontrada.');
-  currentStopId = stopId;
+  currentStopId = stopId; // set early so favorites button works immediately
 
   clearLineMarkers(); clearMapElements();
   showPanel('stop');
@@ -1298,7 +1310,7 @@ function toggleFavs() {
 // POLLING (auto-refresh)
 // ═══════════════════════════════════════════════════════
 let pollingActive = true;
-let pollingSeconds = 30;
+let pollingSeconds = 60;
 let pollingTimer = null;
 let countdownTimer = null;
 
@@ -1316,7 +1328,7 @@ function togglePolling() {
 function startPollingCountdown() {
   clearTimeout(pollingTimer);
   clearInterval(countdownTimer);
-  pollingSeconds = 30;
+  pollingSeconds = 60;
   document.getElementById('polling-countdown').textContent = `${pollingSeconds}s`;
 
   countdownTimer = setInterval(() => {
@@ -1340,7 +1352,7 @@ function startPollingCountdown() {
       await buscarBusPorNumero();
     }
     startPollingCountdown();
-  }, 30000);
+  }, 60000);
 }
 
 // ═══════════════════════════════════════════════════════
