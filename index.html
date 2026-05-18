@@ -422,7 +422,7 @@
 
     /* ─── MISC ──────────────────────────────────────── */
     .leaflet-popup-content-wrapper { border-radius: 10px !important; font-family: 'Nunito', sans-serif; font-size: 0.76rem; }
-    .leaflet-popup-content { margin: 8px 10px !important; line-height: 1.45; }
+    .leaflet-popup-content { margin: 10px !important; line-height: 1.45; }
     .leaflet-popup-content b { font-family: 'Nunito', sans-serif; font-weight: 700; }
 
     .chip {
@@ -1134,7 +1134,7 @@ async function buscarBusesPorParada() {
       const schedShort = bus.hora.substring(0,5);
       const estShort = bus.estDisplay.substring(0,5);
       return `
-        <div class="bus-card" onclick="mostrarRecorrido('${bus.trip_id}','${bus.shape_id}')">
+        <div class="bus-card" onclick="setTab('bus',document.querySelectorAll('.tab-btn')[2]);mostrarRecorrido('${bus.trip_id}','${bus.shape_id}')">
           <div class="bus-card-top">
             <span class="bus-badge">${bus.linea}</span>
             <span class="bus-card-dest">${bus.destino}</span>
@@ -1263,15 +1263,18 @@ function renderStopList(stopsOnRoute) {
     }
     const div = document.createElement('div');
     div.className = 'stop-list-item';
+    div.style.cursor = 'pointer';
+    div.title = 'Ver próximos buses en esta parada';
     div.innerHTML = `
       <div class="stop-dot ${isCurrent?'current':''}"></div>
       <div class="stop-list-info">
-        <div class="stop-list-name">${name} ${isCurrent?'📍':''}</div>
+        <div class="stop-list-name" style="text-decoration:underline dotted;text-underline-offset:3px">${name} ${isCurrent?'📍':''}</div>
         <div class="stop-list-times">
           ${st.arrival_time} ${estHtml ? '→ '+estHtml : ''}
         </div>
       </div>
     `;
+    div.addEventListener('click', () => rellenarYBuscarParada(st.stop_id, name));
     listEl.appendChild(div);
   });
 }
