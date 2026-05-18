@@ -1052,10 +1052,12 @@ async function buscarBusesPorParada() {
       const recAt = act.querySelector('RecordedAtTime')?.textContent.trim();
       const busLat = parseFloat(act.querySelector('Latitude')?.textContent);
       const busLon = parseFloat(act.querySelector('Longitude')?.textContent);
+      const vrefRT = act.querySelector('VehicleRef')?.textContent.trim();
       if (jref && spRef && recAt) rtMap.set(jref, {
         stopPointRef: spRef, recordedAtTimeISO: recAt,
         lat: isNaN(busLat) ? null : busLat,
-        lon: isNaN(busLon) ? null : busLon
+        lon: isNaN(busLon) ? null : busLon,
+        vref: vrefRT || null
       });
     }
   } catch(e) { console.warn('RT fetch failed', e); }
@@ -1107,11 +1109,13 @@ async function buscarBusesPorParada() {
     }
 
     if (estSec >= currentSec) {
+      const liveEntry = rtMap.get(st.trip_id);
       upcoming.push({
         linea: trip.route_id, hora: st.departure_time,
         estSec, estDisplay: secondsToTime(estSec),
         delayPill, isBusOnTime,
-        destino: trip.trip_headsign, trip_id: st.trip_id, shape_id: trip.shape_id
+        destino: trip.trip_headsign, trip_id: st.trip_id, shape_id: trip.shape_id,
+        vref: liveEntry?.vref || null
       });
     }
   }
@@ -1134,7 +1138,7 @@ async function buscarBusesPorParada() {
       const schedShort = bus.hora.substring(0,5);
       const estShort = bus.estDisplay.substring(0,5);
       return `
-        <div class="bus-card" onclick="setTab('bus',document.querySelectorAll('.tab-btn')[2]);mostrarRecorrido('${bus.trip_id}','${bus.shape_id}')">
+        <div class="bus-card" onclick="setTab('bus',document.querySelectorAll('.tab-btn')[2]);${bus.vref?`document.getElementById('numBus').value='${bus.vref}';`:''};mostrarRecorrido('${bus.trip_id}','${bus.shape_id}')">
           <div class="bus-card-top">
             <span class="bus-badge">${bus.linea}</span>
             <span class="bus-card-dest">${bus.destino}</span>
