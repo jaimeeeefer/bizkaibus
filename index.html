@@ -975,6 +975,7 @@ async function buscarBusesPorLinea() {
         <b>Parada:</b> <a href="#" onclick="rellenarYBuscarParada('${sp}','${paradaTxt}');return false">${paradaTxt} (${sp})</a><br>
         <b>Bus nº:</b> <a href="#" onclick="rellenarYBuscarBus('${vref}');return false">${vref}</a><br>
         <b>Matrícula:</b> ${infoBus.matricula}<br>
+        <b>Fecha:</b> ${infoBus.fecha}<br>
         <b>Modelo:</b> ${infoBus.modelo}
       `);
       markers.push(marcador);
