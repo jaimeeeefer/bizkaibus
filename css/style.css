@@ -464,6 +464,13 @@ body {
   #mobile-toggle  { display: flex; }
   #results-panel  { max-height: 250px; overflow-y: auto; }
   #favs-section   { position: static; }
-  #polling-label  { display: inline; }
-  #polling-toggle { gap: 5px; font-size: 0.75rem; }
+  #polling-label  { display: none; }
+  #polling-toggle { gap: 4px; font-size: 0.75rem; }
+}
+/* ─── DARK MAP FILTER — counter-invert markers/popups/controls ───────── */
+[data-theme="dark"] #map .leaflet-marker-icon,
+[data-theme="dark"] #map .leaflet-popup-pane,
+[data-theme="dark"] #map .leaflet-control-zoom,
+[data-theme="dark"] #map .leaflet-control-attribution {
+  filter: invert(100%) hue-rotate(180deg) brightness(1.18) saturate(1.1);
 }

@@ -234,8 +234,7 @@ function toggleTheme() {
   localStorage.setItem('theme', next);
   document.getElementById('theme-toggle').textContent = next === 'dark' ? '☀️' : '🌙';
   // Swap map tile layer
-  if (next === 'dark') { map.removeLayer(tileLight); tileDark.addTo(map); }
-  else                 { map.removeLayer(tileDark);  tileLight.addTo(map); }
+  applyMapTheme(next === 'dark');
 }
 
 // Sync button icon on load
@@ -265,14 +264,16 @@ const map = L.map("map").setView([43.25, -2.93], 10);
 const tileLight = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "© OpenStreetMap contributors",
 });
-const tileDark = L.tileLayer("https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png", {
-  attribution: '© <a href="https://stadiamaps.com/">Stadia Maps</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-  maxZoom: 20,
-});
+tileLight.addTo(map);
 
-// Apply correct tile on init
-if (localStorage.getItem('theme') === 'dark') tileDark.addTo(map);
-else tileLight.addTo(map);
+// Dark mode: CSS filter on the map container — keeps OSM colours, just darkens them
+function applyMapTheme(dark) {
+  const pane = document.getElementById('map');
+  pane.style.filter = dark
+    ? 'invert(93%) hue-rotate(180deg) brightness(0.85) saturate(0.9)'
+    : '';
+}
+if (localStorage.getItem('theme') === 'dark') applyMapTheme(true);
 
 const busIcon = L.icon({
   iconUrl: './img/bus-marker.png',
