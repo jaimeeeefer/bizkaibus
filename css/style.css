@@ -128,3 +128,110 @@ button {
     color: blue; 
     cursor: default; 
 }
+
+/* ─── 1. BARRA DE PROGRESO (POLLING) ────────────────────────────────────── */
+#polling-progress-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.1); /* Fondo sutil de la barra */
+}
+
+#polling-progress-bar {
+  width: 100%;
+  height: 100%;
+  background: #1DAB5F; /* Color verde de Bizkaibus para la carga */
+  transition: width 1s linear;
+}
+
+
+/* ─── 2. ADAPTACIÓN FLEX PARA EL BOTÓN GPS (📍) ─────────────────────────── */
+/* Forzamos que el input y el botón GPS compartan línea limpiamente */
+.search-input-row {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  align-items: center;
+  width: 300px;
+  max-width: 90vw;
+  margin: 0 auto;
+}
+
+/* Hacemos que el input se estire para dejarle el hueco justo al botón 📍 */
+.search-input-row input {
+  flex: 1;
+  width: 100% !important; 
+  margin-bottom: 0 !important; /* Evita desfases de altura */
+}
+
+.btn-gps {
+  height: 38px; /* Misma altura que el input estándar */
+  width: 38px;
+  padding: 0;
+  font-size: 1.1em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 1px solid #ccc;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+}
+
+
+/* ─── 3. HOJA DE ESTILOS PARA MODO OSCURO (DARK MODE) ───────────────────── */
+/* Cuando JavaScript inyecta .dark-mode al body, estos estilos se activan */
+body.dark-mode {
+  background-color: #121212;
+  color: #e0e0e0;
+}
+
+/* Inputs y Cajas de texto en modo oscuro */
+body.dark-mode input {
+  background-color: #1e1e1e;
+  color: #ffffff;
+  border: 1px solid #444;
+}
+
+/* Botones normales */
+body.dark-mode button {
+  background-color: #2a2a2a;
+  color: #ffffff;
+  border: 1px solid #444;
+}
+body.dark-mode button:hover {
+  background-color: #3a3a3a;
+}
+
+/* El botón flotante/Gps en modo oscuro */
+body.dark-mode .btn-gps {
+  background-color: #2a2a2a;
+  border: 1px solid #444;
+}
+
+/* Tarjetas de los Autobuses (.bus-option) */
+body.dark-mode .bus-option {
+  background-color: #1e1e1e;
+  border: 1px solid #333;
+  color: #ffffff;
+}
+body.dark-mode .bus-option:hover {
+  background-color: #2d2d2d;
+}
+
+/* Detalles de la Ruta Expandida */
+body.dark-mode #route-details {
+  border: 1px solid #444;
+  background-color: #1c1c1c;
+}
+body.dark-mode #route-details li {
+  border-bottom: 1px dashed #333;
+}
+
+/* Ajuste del contenedor de la barra de progreso en fondo oscuro */
+body.dark-mode #polling-progress-container {
+  background: rgba(255, 255, 255, 0.15);
+}
