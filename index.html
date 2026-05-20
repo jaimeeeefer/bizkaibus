@@ -157,9 +157,17 @@
       <!-- Route details -->
       <div id="route-details-panel">
         <div class="route-header" id="route-header-card">
-          <div class="line-id" id="route-line-name"></div>
-          <div class="headsign" id="route-headsign"></div>
-          <div class="delay-info" id="delay-info"></div>
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+            <div>
+              <div class="line-id" id="route-line-name"></div>
+              <div class="headsign" id="route-headsign"></div>
+              <div class="delay-info" id="delay-info"></div>
+            </div>
+            <button class="btn-panel-action share-btn" id="btn-share-bus" onclick="compartirBus()"
+              style="display:inline-block;flex-shrink:0;margin-top:2px;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3);color:white">
+              🔗 Compartir
+            </button>
+          </div>
         </div>
         <div id="route-stop-list"></div>
       </div>
@@ -225,7 +233,9 @@ function toggleTheme() {
   document.documentElement.setAttribute('data-theme', next);
   localStorage.setItem('theme', next);
   document.getElementById('theme-toggle').textContent = next === 'dark' ? '☀️' : '🌙';
-  // Re-render tile layer colours if needed (Leaflet tiles are always light, that's fine)
+  // Swap map tile layer
+  if (next === 'dark') { map.removeLayer(tileLight); tileDark.addTo(map); }
+  else                 { map.removeLayer(tileDark);  tileLight.addTo(map); }
 }
 
 // Sync button icon on load
@@ -251,9 +261,18 @@ const CALENDAR_DATES_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkai
 // MAP
 // ═══════════════════════════════════════════════════════
 const map = L.map("map").setView([43.25, -2.93], 10);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+
+const tileLight = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "© OpenStreetMap contributors",
-}).addTo(map);
+});
+const tileDark = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
+  subdomains: 'abcd', maxZoom: 19,
+});
+
+// Apply correct tile on init
+if (localStorage.getItem('theme') === 'dark') tileDark.addTo(map);
+else tileLight.addTo(map);
 
 const busIcon = L.icon({
   iconUrl: './img/bus-marker.png',
@@ -533,6 +552,10 @@ function compartirParada() {
 }
 function compartirLinea() {
   if (lastLineSearch) copiarURL({ linea: lastLineSearch });
+}
+function compartirBus() {
+  const num = document.getElementById('numBus').value.trim();
+  if (num) copiarURL({ bus: num });
 }
 
 // ═══════════════════════════════════════════════════════
