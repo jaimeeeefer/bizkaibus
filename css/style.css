@@ -18,6 +18,9 @@
   --orange:       #F5A623;
   --sidebar-w:    400px;
   --topbar-h:     56px;
+  --route-card-bg:   #1E2130;
+  --route-card-text: #FFFFFF;
+  --route-card-sub:  rgba(255,255,255,.6);
 }
 
 /* ─── DARK MODE ──────────────────────────────────────── */
@@ -34,6 +37,9 @@
   --white:        #1E2130;
   --green:        #1DAB5F;
   --orange:       #F5A623;
+  --route-card-bg:   #0D1117;
+  --route-card-text: #E8EAF0;
+  --route-card-sub:  rgba(232,234,240,.5);
 }
 
 /* ─── RESET & BASE ───────────────────────────────────── */
@@ -348,11 +354,13 @@ body {
 /* ─── ROUTE DETAILS ──────────────────────────────────── */
 #route-details-panel { display: none; }
 .route-header {
-  background: var(--ink-mid); color: white;
+  background: var(--route-card-bg);
+  color: var(--route-card-text);
   border-radius: 12px; padding: 14px; margin-bottom: 12px;
+  border: 1px solid var(--border);
 }
-.route-header .line-id  { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1.2rem; }
-.route-header .headsign { font-size: 0.85rem; color: rgba(255,255,255,.7); margin-top: 3px; }
+.route-header .line-id  { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1.2rem; color: var(--route-card-text); }
+.route-header .headsign { font-size: 0.85rem; color: var(--route-card-sub); margin-top: 3px; }
 .route-header .delay-info { margin-top: 8px; font-size: 0.85rem; font-weight: 500; }
 
 .stop-list-item {
