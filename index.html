@@ -270,7 +270,7 @@ tileLight.addTo(map);
 function applyMapTheme(dark) {
   const pane = document.getElementById('map');
   pane.style.filter = dark
-    ? 'invert(93%) hue-rotate(180deg) brightness(0.85) saturate(0.9)'
+    ? 'invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%)'
     : '';
 }
 if (localStorage.getItem('theme') === 'dark') applyMapTheme(true);
