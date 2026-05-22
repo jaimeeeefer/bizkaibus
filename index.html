@@ -667,7 +667,7 @@ async function buscarBusesPorLinea() {
         <b>Línea:</b> <a href="#" onclick="rellenarYBuscarLinea('${lineaLimpia}');return false">${lineaLimpia}</a><br>
         <b>Parada:</b> <a href="#" onclick="rellenarYBuscarParada('${sp}','${paradaTxt}');return false">${paradaTxt} (${sp})</a><br>
         <b>Bus nº:</b> <a href="#" onclick="rellenarYBuscarBus('${vref}');return false">${vref}</a><br>
-        <b>Matrícula:</b> ${infoBus.matricula} · <b>Modelo:</b> ${infoBus.modelo}<br>
+        <b>Matrícula:</b> ${infoBus.matricula} · <b>Fecha:</b> ${infoBus.fecha}<br>
         <b>Modelo:</b> ${infoBus.modelo}
       `);
       markers.push(marcador);
