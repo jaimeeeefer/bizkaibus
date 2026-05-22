@@ -9,6 +9,24 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Nunito:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,300;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    /* ── Clear (X) button inside search inputs ── */
+    .clear-btn {
+      position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+      display: none; /* shown via JS when input has value */
+      align-items: center; justify-content: center;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--ink-soft); color: var(--white);
+      border: none; cursor: pointer; font-size: 0.6rem; font-weight: 700;
+      line-height: 1; padding: 0;
+      transition: background 0.15s, transform 0.1s;
+      z-index: 10;
+    }
+    .clear-btn:hover  { background: var(--accent); transform: translateY(-50%) scale(1.15); }
+    .clear-btn:active { transform: translateY(-50%) scale(0.9); }
+    /* Shrink input right padding so text doesn't hide behind X */
+    .search-input-row input { padding-right: 2rem; }
+  </style>
   <script>
     // Apply dark mode before paint to avoid flash
     if (localStorage.getItem('theme') === 'dark') {
@@ -95,7 +113,8 @@
       <div class="search-input-wrap active" id="wrap-linea">
         <div class="search-input-row">
           <span class="search-icon">🔍</span>
-          <input type="text" id="linea" placeholder="Ej: A3935 o 3935" />
+          <input type="text" id="linea" placeholder="Ej: A3935 o 3935" oninput="toggleClear('clear-linea',this.value)" />
+          <button class="clear-btn" id="clear-linea" onclick="clearInput('linea','clear-linea')" title="Borrar">✕</button>
         </div>
         <button class="search-btn" onclick="buscarBusesPorLinea()">Ver buses en mapa</button>
       </div>
@@ -105,7 +124,8 @@
         <div class="search-input-row" style="position:relative">
           <span class="search-icon">🔍</span>
           <input type="text" id="parada-nombre" placeholder="Nombre o nº de parada…"
-                 oninput="onParadaInput()" onblur="setTimeout(()=>closeAutocomplete(),200)" />
+                 oninput="onParadaInput();toggleClear('clear-parada',this.value)" onblur="setTimeout(()=>closeAutocomplete(),200)" />
+          <button class="clear-btn" id="clear-parada" onclick="clearInput('parada-nombre','clear-parada');document.getElementById('parada').value='';selectedStopId=null;" title="Borrar">✕</button>
           <div id="stop-autocomplete"></div>
         </div>
         <button class="search-btn" onclick="buscarBusesPorParada()">Ver próximos buses</button>
@@ -116,7 +136,8 @@
       <div class="search-input-wrap" id="wrap-bus">
         <div class="search-input-row">
           <span class="search-icon">🚌</span>
-          <input type="text" id="numBus" placeholder="Ej: 1514" />
+          <input type="text" id="numBus" placeholder="Ej: 1514" oninput="toggleClear('clear-bus',this.value)" />
+          <button class="clear-btn" id="clear-bus" onclick="clearInput('numBus','clear-bus')" title="Borrar">✕</button>
         </div>
         <button class="search-btn" onclick="buscarBusPorNumero()">Localizar bus</button>
       </div>
@@ -534,33 +555,52 @@ function showPanel(name) {
 }
 
 // ═══════════════════════════════════════════════════════
+// CLEAR INPUT HELPERS
+// ═══════════════════════════════════════════════════════
+function toggleClear(btnId, value) {
+  const btn = document.getElementById(btnId);
+  if (btn) btn.style.display = value ? 'flex' : 'none';
+}
+function clearInput(inputId, btnId) {
+  const el = document.getElementById(inputId);
+  if (el) { el.value = ''; el.focus(); }
+  toggleClear(btnId, '');
+}
+
+// ═══════════════════════════════════════════════════════
 // SHARE
 // ═══════════════════════════════════════════════════════
 function mostrarToast(msg) {
   const t = document.getElementById('share-toast');
   t.textContent = msg || '✓ Enlace copiado al portapapeles';
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
+  setTimeout(() => t.classList.remove('show'), 2800);
 }
 
-function copiarURL(params) {
+function copiarURL(params, texto) {
   const url = new URL(window.location.href);
   url.search = '';
   Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, v));
-  navigator.clipboard.writeText(url.toString())
-    .then(() => mostrarToast('✓ Enlace copiado al portapapeles'))
+  // Compose share text: "Texto URL"  — WhatsApp renders it nicely
+  const contenido = texto ? `${texto}\n${url.toString()}` : url.toString();
+  navigator.clipboard.writeText(contenido)
+    .then(() => mostrarToast('✓ Enlace copiado — listo para pegar'))
     .catch(() => mostrarToast('No se pudo copiar el enlace'));
 }
 
 function compartirParada() {
-  if (currentStopId) copiarURL({ parada: currentStopId });
+  if (!currentStopId) return;
+  const nombre = getCleanStopName(currentStopId);
+  copiarURL({ parada: currentStopId }, `🚏 Mira las salidas de ${nombre}:`);
 }
 function compartirLinea() {
-  if (lastLineSearch) copiarURL({ linea: lastLineSearch });
+  if (!lastLineSearch) return;
+  copiarURL({ linea: lastLineSearch }, `🚌 Mira los buses en la línea ${lastLineSearch}:`);
 }
 function compartirBus() {
   const num = document.getElementById('numBus').value.trim();
-  if (num) copiarURL({ bus: num });
+  if (!num) return;
+  copiarURL({ bus: num }, `🚌 Sigue el bus ${num} en tiempo real:`);
 }
 
 // ═══════════════════════════════════════════════════════
