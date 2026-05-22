@@ -623,7 +623,8 @@ async function buscarBusesPorLinea() {
         <b>Línea:</b> <a href="#" onclick="rellenarYBuscarLinea('${lineaLimpia}');return false">${lineaLimpia}</a><br>
         <b>Parada:</b> <a href="#" onclick="rellenarYBuscarParada('${sp}','${paradaTxt}');return false">${paradaTxt} (${sp})</a><br>
         <b>Bus nº:</b> <a href="#" onclick="rellenarYBuscarBus('${vref}');return false">${vref}</a><br>
-        <b>Matrícula:</b> ${infoBus.matricula} · <b>Modelo:</b> ${infoBus.modelo}
+        <b>Matrícula:</b> ${infoBus.matricula} · <b>Fecha:</b> ${infoBus.fecha}
+        <b>Modelo:</b> ${infoBus.modelo}
       `);
       markers.push(marcador);
       bounds.extend([lat, lon]);
@@ -838,6 +839,7 @@ async function localizarBusEnTiempoReal(targetTripId, targetVehicleRef) {
         <b>Línea:</b> <a href="#" onclick="rellenarYBuscarLinea('${lineaDisplay}');return false">${lineaDisplay}</a> · <b>Destino:</b> ${destDisplay}<br>
         <b>Parada:</b> <a href="#" onclick="rellenarYBuscarParada('${spRef}','${paradaNom}');return false">${paradaNom} (${spRef})</a><br>
         <b>Bus nº:</b> ${vref} · <b>Matrícula:</b> ${infoBus.matricula}
+        <b>Modelo:</b> ${infoBus.modelo}
       `, { maxWidth: 220 }).openPopup();
 
       if (recAt && spRef && jref) {
