@@ -467,10 +467,13 @@ body {
   #polling-label  { display: none; }
   #polling-toggle { gap: 4px; font-size: 0.75rem; }
 }
-/* ─── DARK MAP FILTER — counter-invert markers/popups/controls ───────── */
-[data-theme="dark"] #map .leaflet-marker-icon,
+/* ─── DARK MAP FILTER — exact inverse on marker/popup/control panes ───── */
+/* Map filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%) */
+/* Inverse:    invert(100%) hue-rotate(180deg) brightness(105.3%) contrast(111.1%) */
+[data-theme="dark"] #map .leaflet-marker-pane,
+[data-theme="dark"] #map .leaflet-shadow-pane,
 [data-theme="dark"] #map .leaflet-popup-pane,
 [data-theme="dark"] #map .leaflet-control-zoom,
 [data-theme="dark"] #map .leaflet-control-attribution {
-  filter: invert(100%) hue-rotate(180deg) brightness(1.18) saturate(1.1);
+  filter: invert(100%) hue-rotate(180deg) brightness(105.3%) contrast(111.1%);
 }
