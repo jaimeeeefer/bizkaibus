@@ -268,10 +268,14 @@ tileLight.addTo(map);
 
 // Dark mode: CSS filter on the map container — keeps OSM colours, just darkens them
 function applyMapTheme(dark) {
-  const pane = document.getElementById('map');
-  pane.style.filter = dark
-    ? 'invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%)'
-    : '';
+  // Filter only the tile pane — markers, popups and controls are sibling panes
+  // inside Leaflet's structure and won't be affected
+  const tilePanes = document.querySelectorAll('#map .leaflet-tile-pane');
+  tilePanes.forEach(p => {
+    p.style.filter = dark
+      ? 'invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%)'
+      : '';
+  });
 }
 if (localStorage.getItem('theme') === 'dark') applyMapTheme(true);
 
@@ -623,7 +627,7 @@ async function buscarBusesPorLinea() {
         <b>Línea:</b> <a href="#" onclick="rellenarYBuscarLinea('${lineaLimpia}');return false">${lineaLimpia}</a><br>
         <b>Parada:</b> <a href="#" onclick="rellenarYBuscarParada('${sp}','${paradaTxt}');return false">${paradaTxt} (${sp})</a><br>
         <b>Bus nº:</b> <a href="#" onclick="rellenarYBuscarBus('${vref}');return false">${vref}</a><br>
-        <b>Matrícula:</b> ${infoBus.matricula} · <b>Fecha:</b> ${infoBus.fecha}<br>
+        <b>Matrícula:</b> ${infoBus.matricula} · <b>Modelo:</b> ${infoBus.modelo}<br>
         <b>Modelo:</b> ${infoBus.modelo}
       `);
       markers.push(marcador);
