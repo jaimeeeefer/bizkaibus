@@ -837,7 +837,15 @@ async function verTodosLosBuses() {
   }
 }
 
-
+// Refresca sin pasar por el toggle on/off
+async function refrescarTodosLosBuses() {
+  clearMapElements(); clearLineMarkers();
+  // Re-run the fetch+render part directly (todosActivo stays true)
+  const saved = todosActivo;
+  todosActivo = false;       // temporarily trick verTodosLosBuses past the toggle check
+  await verTodosLosBuses();
+  todosActivo = saved;       // restore (verTodosLosBuses sets it to true anyway)
+}
 let currentStopId = null;
 
 async function buscarBusesPorParada() {
@@ -1244,9 +1252,7 @@ function startPollingCountdown() {
     const stopId    = document.getElementById('parada').value.trim();
     const lineaVal  = document.getElementById('linea').value.trim();
     const busVal    = document.getElementById('numBus').value.trim();
-    const lineVisible  = document.getElementById('line-results').style.display !== 'none';
-    const todosActive  = lineVisible && !lastLineSearch;
-    if      (todosActive) await verTodosLosBuses();
+    if      (todosActivo) await refrescarTodosLosBuses();
     else if (document.getElementById('stop-results').style.display !== 'none' && stopId)   await buscarBusesPorParada();
     else if (document.getElementById('line-results').style.display !== 'none' && lineaVal) await buscarBusesPorLinea();
     else if (busVal) await buscarBusPorNumero();
