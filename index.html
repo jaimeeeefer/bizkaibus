@@ -570,7 +570,6 @@ function clearInput(inputId, btnId) {
   const el = document.getElementById(inputId);
   if (el) { el.value = ''; el.focus(); }
   toggleClear(btnId, '');
-  startPollingCountdown(); // re-evaluate: if nothing active, shows —
 }
 
 // ═══════════════════════════════════════════════════════
@@ -759,13 +758,15 @@ async function verTodosLosBuses() {
         className: '',
         html: `<div style="
           background:${color};color:white;
-          font-family:'Nunito',sans-serif;font-weight:700;font-size:0.65rem;
-          padding:2px 5px;border-radius:5px;
-          box-shadow:0 2px 6px rgba(0,0,0,.35);
-          white-space:nowrap;line-height:1.3;
-          border:1.5px solid rgba(255,255,255,.4);
+          font-family:'Nunito',sans-serif;font-weight:800;font-size:0.7rem;
+          padding:3px 7px;border-radius:6px;
+          box-shadow:0 2px 6px rgba(0,0,0,.4);
+          white-space:nowrap;line-height:1.4;
+          border:2px solid rgba(255,255,255,.5);
+          display:inline-block;
         ">${lineaLimpia}</div>`,
-        iconAnchor: [18, 10],
+        iconSize: null,
+        iconAnchor: null,
       });
 
       const marcador = L.marker([lat, lon], { icon: divIcon }).addTo(map);
@@ -1202,24 +1203,9 @@ function togglePolling() {
   }
 }
 
-function hasActiveSearch() {
-  const stopId   = document.getElementById('parada').value.trim();
-  const lineaVal = document.getElementById('linea').value.trim();
-  const busVal   = document.getElementById('numBus').value.trim();
-  const stopVisible  = document.getElementById('stop-results').style.display  !== 'none';
-  const lineVisible  = document.getElementById('line-results').style.display  !== 'none';
-  const routeVisible = document.getElementById('route-details-panel').style.display !== 'none';
-  const todosActive  = lineVisible && !lastLineSearch; // "ver todos" mode
-  return (stopVisible && stopId) || (lineVisible && lineaVal) || (routeVisible && busVal) || todosActive;
-}
-
 function startPollingCountdown() {
   clearTimeout(pollingTimer); clearInterval(countdownTimer);
-
-  if (!pollingActive || !hasActiveSearch()) {
-    document.getElementById('polling-countdown').textContent = '—';
-    return;
-  }
+  if (!pollingActive) return;
 
   pollingSeconds = 60;
   document.getElementById('polling-countdown').textContent = `${pollingSeconds}s`;
@@ -1230,14 +1216,14 @@ function startPollingCountdown() {
   }, 1000);
   pollingTimer = setTimeout(async () => {
     if (!pollingActive) return;
-    const stopId   = document.getElementById('parada').value.trim();
-    const lineaVal = document.getElementById('linea').value.trim();
-    const busVal   = document.getElementById('numBus').value.trim();
+    const stopId    = document.getElementById('parada').value.trim();
+    const lineaVal  = document.getElementById('linea').value.trim();
+    const busVal    = document.getElementById('numBus').value.trim();
     const lineVisible  = document.getElementById('line-results').style.display !== 'none';
     const todosActive  = lineVisible && !lastLineSearch;
     if      (todosActive) await verTodosLosBuses();
-    else if (document.getElementById('stop-results').style.display  !== 'none' && stopId)   await buscarBusesPorParada();
-    else if (document.getElementById('line-results').style.display  !== 'none' && lineaVal) await buscarBusesPorLinea();
+    else if (document.getElementById('stop-results').style.display !== 'none' && stopId)   await buscarBusesPorParada();
+    else if (document.getElementById('line-results').style.display !== 'none' && lineaVal) await buscarBusesPorLinea();
     else if (busVal) await buscarBusPorNumero();
     startPollingCountdown();
   }, 60000);
