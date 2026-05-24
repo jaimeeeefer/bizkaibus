@@ -565,6 +565,7 @@ function clearInput(inputId, btnId) {
   const el = document.getElementById(inputId);
   if (el) { el.value = ''; el.focus(); }
   toggleClear(btnId, '');
+  startPollingCountdown(); // re-evaluate: if nothing active, shows —
 }
 
 // ═══════════════════════════════════════════════════════
@@ -990,19 +991,23 @@ async function mostrarRecorrido(tripId, shapeId) {
 // ═══════════════════════════════════════════════════════
 function rellenarYBuscarLinea(lineaId) {
   document.getElementById('linea').value = lineaId;
+  toggleClear('clear-linea', lineaId);
   setTab('linea', document.querySelector('.tab-btn'));
   buscarBusesPorLinea();
 }
 function rellenarYBuscarParada(paradaId, nombre) {
   if (!paradaId) return;
-  document.getElementById('parada').value       = paradaId;
-  document.getElementById('parada-nombre').value = nombre || paradaId;
+  const nombreFinal = nombre || paradaId;
+  document.getElementById('parada').value        = paradaId;
+  document.getElementById('parada-nombre').value = nombreFinal;
   selectedStopId = paradaId;
+  toggleClear('clear-parada', nombreFinal);
   setTab('parada', document.querySelectorAll('.tab-btn')[1]);
   buscarBusesPorParada();
 }
 function rellenarYBuscarBus(num) {
   document.getElementById('numBus').value = num;
+  toggleClear('clear-bus', num);
   setTab('bus', document.querySelectorAll('.tab-btn')[2]);
   buscarBusPorNumero();
 }
@@ -1086,8 +1091,24 @@ function togglePolling() {
   }
 }
 
+function hasActiveSearch() {
+  const stopId   = document.getElementById('parada').value.trim();
+  const lineaVal = document.getElementById('linea').value.trim();
+  const busVal   = document.getElementById('numBus').value.trim();
+  const stopVisible  = document.getElementById('stop-results').style.display  !== 'none';
+  const lineVisible  = document.getElementById('line-results').style.display  !== 'none';
+  const routeVisible = document.getElementById('route-details-panel').style.display !== 'none';
+  return (stopVisible && stopId) || (lineVisible && lineaVal) || (routeVisible && busVal);
+}
+
 function startPollingCountdown() {
   clearTimeout(pollingTimer); clearInterval(countdownTimer);
+
+  if (!pollingActive || !hasActiveSearch()) {
+    document.getElementById('polling-countdown').textContent = '—';
+    return;
+  }
+
   pollingSeconds = 60;
   document.getElementById('polling-countdown').textContent = `${pollingSeconds}s`;
   countdownTimer = setInterval(() => {
@@ -1097,11 +1118,11 @@ function startPollingCountdown() {
   }, 1000);
   pollingTimer = setTimeout(async () => {
     if (!pollingActive) return;
-    const stopId  = document.getElementById('parada').value.trim();
+    const stopId   = document.getElementById('parada').value.trim();
     const lineaVal = document.getElementById('linea').value.trim();
-    const busVal  = document.getElementById('numBus').value.trim();
-    if      (document.getElementById('stop-results').style.display !== 'none' && stopId)   await buscarBusesPorParada();
-    else if (document.getElementById('line-results').style.display !== 'none' && lineaVal) await buscarBusesPorLinea();
+    const busVal   = document.getElementById('numBus').value.trim();
+    if      (document.getElementById('stop-results').style.display  !== 'none' && stopId)   await buscarBusesPorParada();
+    else if (document.getElementById('line-results').style.display  !== 'none' && lineaVal) await buscarBusesPorLinea();
     else if (busVal) await buscarBusPorNumero();
     startPollingCountdown();
   }, 60000);
