@@ -790,6 +790,7 @@ async function verTodosLosBuses() {
         ">${lineaLimpia}</div>`,
         iconSize: [pillW, pillH],
         iconAnchor: [pillW / 2, pillH / 2],
+        popupAnchor: [0, -(pillH / 2 + 8)],
       });
 
       const marcador = L.marker([lat, lon], { icon: divIcon }).addTo(map);
@@ -797,9 +798,9 @@ async function verTodosLosBuses() {
         <b>Línea:</b> <a href="#" onclick="rellenarYBuscarLinea('${lineaLimpia}');return false">${lineaLimpia}</a><br>
         <b>Parada:</b> <a href="#" onclick="rellenarYBuscarParada('${sp}','${paradaTxt}');return false">${paradaTxt} (${sp})</a><br>
         <b>Bus nº:</b> <a href="#" onclick="rellenarYBuscarBus('${vref}');return false">${vref}</a><br>
-        <b>Matrícula:</b> ${infoBus.matricula} · <b>Fecha:</b> ${infoBus.fecha}<br>
+        <b>Matrícula:</b> ${infoBus.matricula} &nbsp;·&nbsp; <b>Fecha:</b> ${infoBus.fecha}<br>
         <b>Modelo:</b> ${infoBus.modelo}
-      `, { maxWidth: 220 });
+      `, { maxWidth: 280 });
       markers.push(marcador);
       bounds.extend([lat, lon]);
       found.push({ lineaLimpia, paradaTxt, sp, vref, color });
