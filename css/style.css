@@ -287,7 +287,8 @@ body {
 .search-btn:active { transform: scale(0.98); }
 
 /* ─── AUTOCOMPLETE ───────────────────────────────────── */
-#stop-autocomplete {
+#stop-autocomplete,
+#bus-autocomplete {
   position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 500;
   background: var(--white); border: 1.5px solid var(--border);
   border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.1);

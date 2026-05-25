@@ -135,10 +135,13 @@
 
       <!-- Tab: Bus nº -->
       <div class="search-input-wrap" id="wrap-bus">
-        <div class="search-input-row">
+        <div class="search-input-row" style="position:relative">
           <span class="search-icon">🚌</span>
-          <input type="text" id="numBus" placeholder="Ej: 1514" oninput="toggleClear('clear-bus',this.value)" />
+          <input type="text" id="numBus" placeholder="Nº de bus o modelo…"
+                 oninput="toggleClear('clear-bus',this.value);onBusInput()"
+                 onblur="setTimeout(()=>closeBusAutocomplete(),200)" />
           <button class="clear-btn" id="clear-bus" onmousedown="event.preventDefault();clearInput('numBus','clear-bus')" title="Borrar">✕</button>
+          <div id="bus-autocomplete"></div>
         </div>
         <button class="search-btn" onclick="buscarBusPorNumero()">Localizar bus</button>
       </div>
@@ -980,22 +983,169 @@ async function buscarBusesPorParada() {
 // ═══════════════════════════════════════════════════════
 // SEARCH: BUS NUMBER
 // ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// BUS AUTOCOMPLETE (by number or model)
+// ═══════════════════════════════════════════════════════
+function onBusInput() {
+  const q = document.getElementById('numBus').value.trim().toLowerCase();
+  if (q.length < 2) { closeBusAutocomplete(); return; }
+
+  // Pure number → no autocomplete, just let them type
+  if (/^\d+$/.test(q)) { closeBusAutocomplete(); return; }
+
+  // Match against models in busInfoMap
+  const modelGroups = new Map(); // model → [busNums]
+  for (const [num, info] of busInfoMap) {
+    if (!info.modelo || info.modelo === '—') continue;
+    if (info.modelo.toLowerCase().includes(q)) {
+      if (!modelGroups.has(info.modelo)) modelGroups.set(info.modelo, []);
+      modelGroups.get(info.modelo).push(num);
+    }
+  }
+
+  const ac = document.getElementById('bus-autocomplete');
+  if (!modelGroups.size) { ac.style.display = 'none'; return; }
+
+  ac.innerHTML = [...modelGroups.entries()].slice(0, 8).map(([modelo, nums]) =>
+    `<div class="autocomplete-item" onmousedown="selectBusModel('${modelo.replace(/'/g,"\\'")}')">
+      ${modelo} <span>${nums.length} bus${nums.length !== 1 ? 'es' : ''}</span>
+    </div>`
+  ).join('');
+  ac.style.display = 'block';
+}
+
+function selectBusModel(modelo) {
+  document.getElementById('numBus').value = modelo;
+  toggleClear('clear-bus', modelo);
+  closeBusAutocomplete();
+}
+
+function closeBusAutocomplete() {
+  document.getElementById('bus-autocomplete').style.display = 'none';
+}
+
 async function buscarBusPorNumero() {
-  const numBus = document.getElementById('numBus').value.trim();
-  if (!numBus) return;
+  const input = document.getElementById('numBus').value.trim();
+  if (!input) return;
+  closeBusAutocomplete();
+
+  // Check if input matches a model (non-numeric)
+  if (!/^\d+$/.test(input)) {
+    await buscarBusesPorModelo(input);
+    return;
+  }
+
   clearMapElements(); clearLineMarkers();
   showPanel('route');
   document.getElementById('route-details-panel').style.display = 'block';
   document.getElementById('route-stop-list').innerHTML = '<div class="empty-state"><div class="spinner" style="margin:0 auto"></div></div>';
 
-  const foundTripId = await localizarBusEnTiempoReal(null, numBus);
+  const foundTripId = await localizarBusEnTiempoReal(null, input);
   if (foundTripId) {
     const trip = tripsData.get(foundTripId);
     if (trip) mostrarRecorrido(foundTripId, trip.shape_id);
   } else {
-    document.getElementById('route-stop-list').innerHTML = `<div class="empty-state">Bus nº ${numBus} no encontrado en tiempo real.</div>`;
+    document.getElementById('route-stop-list').innerHTML = `<div class="empty-state">Bus nº ${input} no encontrado en tiempo real.</div>`;
   }
 }
+
+async function buscarBusesPorModelo(modelo) {
+  clearMapElements(); clearLineMarkers();
+  lastLineSearch = null;
+
+  showPanel('line');
+  document.getElementById('btn-fav-linea').style.display   = 'none';
+  document.getElementById('btn-share-linea').style.display = 'none';
+  document.getElementById('line-results-title').textContent = `Modelo: ${modelo}`;
+  document.getElementById('line-bus-list').innerHTML =
+    '<div class="empty-state"><div class="spinner" style="margin:0 auto"></div></div>';
+
+  // Find all bus numbers matching this model
+  const modeloLower = modelo.toLowerCase();
+  const busNums = new Set();
+  for (const [num, info] of busInfoMap) {
+    if (info.modelo && info.modelo.toLowerCase().includes(modeloLower)) busNums.add(num);
+  }
+
+  if (!busNums.size) {
+    document.getElementById('line-bus-list').innerHTML = '<div class="empty-state">No se encontraron buses con ese modelo.</div>';
+    return;
+  }
+
+  // Fetch real-time and filter by matching bus numbers
+  try {
+    const xml = new DOMParser().parseFromString(
+      await (await fetch('/bizkaibus')).text(), 'application/xml'
+    );
+
+    const found = [];
+    const bounds = new L.LatLngBounds();
+
+    for (const act of xml.getElementsByTagName('VehicleActivity')) {
+      const jref = act.querySelector('VehicleJourneyRef')?.textContent.trim().toUpperCase();
+      const vref = act.querySelector('VehicleRef')?.textContent.trim();
+      const lat  = parseFloat(act.querySelector('Latitude')?.textContent);
+      const lon  = parseFloat(act.querySelector('Longitude')?.textContent);
+      const sp   = act.querySelector('StopPointRef')?.textContent.trim();
+      if (!vref || isNaN(lat) || isNaN(lon) || !busNums.has(vref)) continue;
+
+      const match       = jref?.match(/A\d{3,4}/);
+      const lineaLimpia = match ? match[0] : (jref || '?');
+      const paradaTxt   = sp ? getCleanStopName(sp) : 'N/D';
+      const infoBus     = busInfoMap.get(vref) || { matricula:'—', modelo:'—', fecha:'—' };
+
+      const marcador = L.marker([lat, lon], { icon: busIcon }).addTo(map);
+      marcador.bindPopup(`
+        <b>Línea:</b> <a href="#" onclick="rellenarYBuscarLinea('${lineaLimpia}');return false">${lineaLimpia}</a><br>
+        <b>Parada:</b> <a href="#" onclick="rellenarYBuscarParada('${sp}','${paradaTxt}');return false">${paradaTxt} (${sp})</a><br>
+        <b>Bus nº:</b> <a href="#" onclick="rellenarYBuscarBus('${vref}');return false">${vref}</a><br>
+        <b>Matrícula:</b> ${infoBus.matricula} &nbsp;·&nbsp; <b>Fecha:</b> ${infoBus.fecha}<br>
+        <b>Modelo:</b> ${infoBus.modelo}
+      `, { maxWidth: 260 });
+      markers.push(marcador);
+      bounds.extend([lat, lon]);
+      found.push({ lineaLimpia, paradaTxt, sp, vref });
+    }
+
+    const listEl = document.getElementById('line-bus-list');
+    if (!found.length) {
+      // Show all matching buses even if none are live right now
+      const todos = [...busNums];
+      listEl.innerHTML =
+        `<div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:10px">${busNums.size} buses con este modelo · Ninguno circulando ahora</div>` +
+        todos.slice(0, 30).map(num => {
+          const info = busInfoMap.get(num) || {};
+          return `<div class="bus-list-item" onclick="rellenarYBuscarBus('${num}')">
+            <span class="badge" style="background:var(--ink-soft)">#${num}</span>
+            <div class="bus-list-item-info">
+              <div class="main">${info.modelo || '—'}</div>
+              <div class="sub">Matrícula: ${info.matricula || '—'}</div>
+            </div>
+          </div>`;
+        }).join('');
+    } else {
+      if (bounds.isValid()) map.fitBounds(bounds, { padding: [50,50] });
+      found.sort((a,b) => a.lineaLimpia.localeCompare(b.lineaLimpia));
+      listEl.innerHTML =
+        `<div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:10px">${found.length} circulando ahora · ${busNums.size} en flota</div>` +
+        found.map(b => `
+          <div class="bus-list-item" onclick="rellenarYBuscarBus('${b.vref}')">
+            <span class="badge">${b.lineaLimpia}</span>
+            <div class="bus-list-item-info">
+              <div class="main">Bus #${b.vref}</div>
+              <div class="sub">📍 ${b.paradaTxt}</div>
+            </div>
+            <span style="font-size:.8rem;color:var(--ink-soft)">→</span>
+          </div>
+        `).join('');
+    }
+  } catch(e) {
+    console.error(e);
+    document.getElementById('line-bus-list').innerHTML = '<div class="empty-state">Error al obtener datos.</div>';
+  }
+}
+
+
 
 // ═══════════════════════════════════════════════════════
 // REAL-TIME LOCATOR
