@@ -1120,7 +1120,7 @@ async function buscarBusesPorModelo(modelo) {
          </div>` +
         offline.map(num => {
           const info = busInfoMap.get(num) || {};
-          return `<div class="bus-list-item" style="opacity:.55" onclick="rellenarYBuscarBus('${num}')">
+          return `<div class="bus-list-item" style="opacity:.75" onclick="rellenarYBuscarBus('${num}')">
             <span class="badge" style="background:var(--ink-soft)">#${num}</span>
             <div class="bus-list-item-info">
               <div class="main">Bus #${num}</div>
