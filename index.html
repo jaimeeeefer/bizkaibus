@@ -637,11 +637,13 @@ function handleURLParams() {
 // SEARCH: LINE
 // ═══════════════════════════════════════════════════════
 let lastLineSearch = null;
+let lastModelSearch = null;
 
 async function buscarBusesPorLinea() {
   const inputRaw = document.getElementById('linea').value.trim();
   if (!inputRaw) return;
   lastLineSearch = inputRaw.toUpperCase();
+  lastModelSearch = null;
   const inputNum = extraerNumero(inputRaw);
 
   clearMapElements(); clearLineMarkers();
@@ -1055,6 +1057,7 @@ async function buscarBusPorNumero() {
 async function buscarBusesPorModelo(modelo) {
   clearMapElements(); clearLineMarkers();
   lastLineSearch = null;
+  lastModelSearch = modelo;
 
   showPanel('line');
   document.getElementById('btn-fav-linea').style.display   = 'none';
@@ -1411,13 +1414,15 @@ function startPollingCountdown() {
   }, 1000);
   pollingTimer = setTimeout(async () => {
     if (!pollingActive) return;
-    const stopId    = document.getElementById('parada').value.trim();
-    const lineaVal  = document.getElementById('linea').value.trim();
-    const busVal    = document.getElementById('numBus').value.trim();
-    if      (todosActivo) await refrescarTodosLosBuses();
-    else if (document.getElementById('stop-results').style.display !== 'none' && stopId)   await buscarBusesPorParada();
-    else if (document.getElementById('line-results').style.display !== 'none' && lineaVal) await buscarBusesPorLinea();
-    else if (busVal) await buscarBusPorNumero();
+    const stopId   = document.getElementById('parada').value.trim();
+    const lineaVal = document.getElementById('linea').value.trim();
+    const busVal   = document.getElementById('numBus').value.trim();
+    const lineVisible = document.getElementById('line-results').style.display !== 'none';
+    if      (todosActivo)                        await refrescarTodosLosBuses();
+    else if (lastModelSearch && lineVisible)      await buscarBusesPorModelo(lastModelSearch);
+    else if (lineVisible && lineaVal)             await buscarBusesPorLinea();
+    else if (document.getElementById('stop-results').style.display !== 'none' && stopId) await buscarBusesPorParada();
+    else if (busVal)                              await buscarBusPorNumero();
     startPollingCountdown();
   }, 60000);
 }
