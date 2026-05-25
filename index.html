@@ -1038,6 +1038,9 @@ async function buscarBusPorNumero() {
   clearMapElements(); clearLineMarkers();
   showPanel('route');
   document.getElementById('route-details-panel').style.display = 'block';
+  document.getElementById('route-line-name').textContent = '';
+  document.getElementById('route-headsign').textContent  = '';
+  document.getElementById('delay-info').textContent      = '';
   document.getElementById('route-stop-list').innerHTML = '<div class="empty-state"><div class="spinner" style="margin:0 auto"></div></div>';
 
   const foundTripId = await localizarBusEnTiempoReal(null, input);
@@ -1108,21 +1111,29 @@ async function buscarBusesPorModelo(modelo) {
     }
 
     const listEl = document.getElementById('line-bus-list');
-    if (!found.length) {
-      // Show all matching buses even if none are live right now
-      const todos = [...busNums];
-      listEl.innerHTML =
-        `<div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:10px">${busNums.size} buses con este modelo · Ninguno circulando ahora</div>` +
-        todos.slice(0, 30).map(num => {
+    const liveVrefs = new Set(found.map(b => b.vref));
+    const offline = [...busNums].filter(n => !liveVrefs.has(n)).sort((a,b) => a.localeCompare(b));
+
+    const offlineHTML = offline.length
+      ? `<div style="font-size:0.78rem;color:var(--ink-soft);margin:10px 0 6px;padding-top:8px;border-top:1px solid var(--border)">
+           Sin circular ahora (${offline.length})
+         </div>` +
+        offline.map(num => {
           const info = busInfoMap.get(num) || {};
-          return `<div class="bus-list-item" onclick="rellenarYBuscarBus('${num}')">
+          return `<div class="bus-list-item" style="opacity:.55" onclick="rellenarYBuscarBus('${num}')">
             <span class="badge" style="background:var(--ink-soft)">#${num}</span>
             <div class="bus-list-item-info">
-              <div class="main">${info.modelo || '—'}</div>
+              <div class="main">Bus #${num}</div>
               <div class="sub">Matrícula: ${info.matricula || '—'}</div>
             </div>
           </div>`;
-        }).join('');
+        }).join('')
+      : '';
+
+    if (!found.length) {
+      listEl.innerHTML =
+        `<div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:10px">${busNums.size} buses · Ninguno circulando ahora</div>` +
+        offlineHTML;
     } else {
       if (bounds.isValid()) map.fitBounds(bounds, { padding: [50,50] });
       found.sort((a,b) => a.lineaLimpia.localeCompare(b.lineaLimpia));
@@ -1137,7 +1148,8 @@ async function buscarBusesPorModelo(modelo) {
             </div>
             <span style="font-size:.8rem;color:var(--ink-soft)">→</span>
           </div>
-        `).join('');
+        `).join('') +
+        offlineHTML;
     }
   } catch(e) {
     console.error(e);
