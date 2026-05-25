@@ -487,12 +487,28 @@ async function cargarDatosGTFS() {
   updateFavsUI();
 }
 
+function concesionAbrev(raw) {
+  if (!raw || raw === '—') return '';
+  const r = raw.toLowerCase();
+  if (r.includes('ezkerraldea') || r.includes('meatzaldea')) return 'EMB';
+  if (r.includes('euskotren'))   return 'Euskotren';
+  if (r.includes('vectalia'))    return 'Vectalia';
+  if (r.includes('avanza'))      return 'Avanza';
+  if (r.includes('busturialdea') || r.includes('lea artibai')) return 'BLB';
+  return raw; // fallback: show as-is
+}
+
 async function cargarBusInfo() {
   try {
     const rows = (await (await fetch(SHEET_TSV_URL)).text()).trim().split('\n').map(r => r.split('\t'));
     rows.slice(1).forEach(r => {
       const num = r[0]?.trim();
-      if (num) busInfoMap.set(num, { matricula: r[1]?.trim()||'—', modelo: r[2]?.trim()||'—', fecha: r[3]?.trim()||'—' });
+      if (num) busInfoMap.set(num, {
+        matricula:  r[1]?.trim() || '—',
+        modelo:     r[2]?.trim() || '—',
+        fecha:      r[3]?.trim() || '—',
+        concesion:  r[4]?.trim() || '—',
+      });
     });
   } catch(e) { console.warn('busInfo error', e); }
 }
@@ -670,7 +686,8 @@ async function buscarBusesPorLinea() {
       if (lineaLimpia !== lastLineSearch && !(inputNum && lineaNum === inputNum)) continue;
 
       const paradaTxt = sp ? getCleanStopName(sp) : 'N/D';
-      const infoBus   = busInfoMap.get(vref) || { matricula:'—', modelo:'—', fecha:'—' };
+      const infoBus   = busInfoMap.get(vref) || { matricula:'—', modelo:'—', fecha:'—', concesion:'—' };
+      const abrev     = concesionAbrev(infoBus.concesion);
 
       const marcador = L.marker([lat, lon], { icon: busIcon }).addTo(map);
       marcador.bindPopup(`
@@ -682,7 +699,7 @@ async function buscarBusesPorLinea() {
       `);
       markers.push(marcador);
       bounds.extend([lat, lon]);
-      found.push({ lineaLimpia, paradaTxt, sp, vref, infoBus });
+      found.push({ lineaLimpia, paradaTxt, sp, vref, abrev });
     }
 
     const listEl = document.getElementById('line-bus-list');
@@ -694,7 +711,7 @@ async function buscarBusesPorLinea() {
         <div class="bus-list-item" onclick="rellenarYBuscarBus('${b.vref}')">
           <span class="badge">${b.lineaLimpia}</span>
           <div class="bus-list-item-info">
-            <div class="main">Bus #${b.vref}</div>
+            <div class="main">Bus #${b.vref}${b.abrev ? ` <span style="font-size:0.72rem;color:var(--ink-soft);font-weight:400">(${b.abrev})</span>` : ''}</div>
             <div class="sub">📍 ${b.paradaTxt} (${b.sp})</div>
           </div>
           <span style="font-size:.8rem;color:var(--ink-soft)">→</span>
@@ -995,7 +1012,7 @@ function onBusInput() {
   // Pure number → no autocomplete, just let them type
   if (/^\d+$/.test(q)) { closeBusAutocomplete(); return; }
 
-  // Match against models in busInfoMap
+  // Match against models in busInfoMap — autocomplete shows models containing the query
   const modelGroups = new Map(); // model → [busNums]
   for (const [num, info] of busInfoMap) {
     if (!info.modelo || info.modelo === '—') continue;
@@ -1066,11 +1083,10 @@ async function buscarBusesPorModelo(modelo) {
   document.getElementById('line-bus-list').innerHTML =
     '<div class="empty-state"><div class="spinner" style="margin:0 auto"></div></div>';
 
-  // Find all bus numbers matching this model
-  const modeloLower = modelo.toLowerCase();
+  // Find all bus numbers with exactly this model
   const busNums = new Set();
   for (const [num, info] of busInfoMap) {
-    if (info.modelo && info.modelo.toLowerCase().includes(modeloLower)) busNums.add(num);
+    if (info.modelo && info.modelo.toLowerCase() === modelo.toLowerCase()) busNums.add(num);
   }
 
   if (!busNums.size) {
@@ -1098,7 +1114,8 @@ async function buscarBusesPorModelo(modelo) {
       const match       = jref?.match(/A\d{3,4}/);
       const lineaLimpia = match ? match[0] : (jref || '?');
       const paradaTxt   = sp ? getCleanStopName(sp) : 'N/D';
-      const infoBus     = busInfoMap.get(vref) || { matricula:'—', modelo:'—', fecha:'—' };
+      const infoBus     = busInfoMap.get(vref) || { matricula:'—', modelo:'—', fecha:'—', concesion:'—' };
+      const abrev       = concesionAbrev(infoBus.concesion);
 
       const marcador = L.marker([lat, lon], { icon: busIcon }).addTo(map);
       marcador.bindPopup(`
@@ -1110,7 +1127,7 @@ async function buscarBusesPorModelo(modelo) {
       `, { maxWidth: 260 });
       markers.push(marcador);
       bounds.extend([lat, lon]);
-      found.push({ lineaLimpia, paradaTxt, sp, vref });
+      found.push({ lineaLimpia, paradaTxt, sp, vref, abrev });
     }
 
     const listEl = document.getElementById('line-bus-list');
@@ -1122,11 +1139,12 @@ async function buscarBusesPorModelo(modelo) {
            Sin circular ahora (${offline.length})
          </div>` +
         offline.map(num => {
-          const info = busInfoMap.get(num) || {};
+          const info  = busInfoMap.get(num) || {};
+          const abrev = concesionAbrev(info.concesion);
           return `<div class="bus-list-item" style="opacity:.75" onclick="rellenarYBuscarBus('${num}')">
             <span class="badge" style="background:var(--ink-soft)">#${num}</span>
             <div class="bus-list-item-info">
-              <div class="main">Bus #${num}</div>
+              <div class="main">Bus #${num}${abrev ? ` <span style="font-size:0.72rem;color:var(--ink-soft);font-weight:400">(${abrev})</span>` : ''}</div>
               <div class="sub">Matrícula: ${info.matricula || '—'}</div>
             </div>
           </div>`;
@@ -1146,7 +1164,7 @@ async function buscarBusesPorModelo(modelo) {
           <div class="bus-list-item" onclick="rellenarYBuscarBus('${b.vref}')">
             <span class="badge">${b.lineaLimpia}</span>
             <div class="bus-list-item-info">
-              <div class="main">Bus #${b.vref}</div>
+              <div class="main">Bus #${b.vref}${b.abrev ? ` <span style="font-size:0.72rem;color:var(--ink-soft);font-weight:400">(${b.abrev})</span>` : ''}</div>
               <div class="sub">📍 ${b.paradaTxt}</div>
             </div>
             <span style="font-size:.8rem;color:var(--ink-soft)">→</span>
