@@ -914,63 +914,81 @@ async function buscarBusesPorParada() {
     }
   } catch(e) { console.warn('RT fetch failed', e); }
 
-  const upcoming = [];
-  for (const st of stopTimesData.filter(s => s.stop_id === stopId)) {
-    const trip    = tripsData.get(st.trip_id);
-    if (!trip) continue;
-    const service = calendarData.get(trip.service_id);
-    if (!service) continue;
-    if (parseInt(currentDate) < parseInt(service.start_date) || parseInt(currentDate) > parseInt(service.end_date)) continue;
+  // ── Helper: get scheduled trips for a stop on a given date/dow ──
+  function getScheduledTrips(dateStr, dayOfWeek, fromSec, applyRT) {
+    const results = [];
+    for (const st of stopTimesData.filter(s => s.stop_id === stopId)) {
+      const trip    = tripsData.get(st.trip_id);
+      if (!trip) continue;
+      const service = calendarData.get(trip.service_id);
+      if (!service) continue;
+      if (parseInt(dateStr) < parseInt(service.start_date) || parseInt(dateStr) > parseInt(service.end_date)) continue;
 
-    const exc = calendarDatesData.get(trip.service_id)?.get(currentDate);
-    let runs = false;
-    if (exc === 1) runs = true;
-    else if (exc === 2) runs = false;
-    else { const days=['sunday','monday','tuesday','wednesday','thursday','friday','saturday']; runs = service[days[dow]] === 1; }
-    if (!runs) continue;
+      const exc = calendarDatesData.get(trip.service_id)?.get(dateStr);
+      let runs = false;
+      if (exc === 1) runs = true;
+      else if (exc === 2) runs = false;
+      else { const days=['sunday','monday','tuesday','wednesday','thursday','friday','saturday']; runs = service[days[dayOfWeek]] === 1; }
+      if (!runs) continue;
 
-    let estSec = timeToSeconds(st.departure_time), delayPill = '', isBusOnTime = false;
+      let estSec = timeToSeconds(st.departure_time), delayPill = '', isBusOnTime = false;
 
-    if (rtMap.has(st.trip_id)) {
-      const allStops = stopTimesData.filter(s => s.trip_id === st.trip_id).sort((a,b)=>a.stop_sequence-b.stop_sequence);
-      const firstDep = timeToSeconds(allStops[0]?.departure_time);
-      if (currentSec < firstDep) {
-        isBusOnTime = true;
-        delayPill = `<span class="delay-pill on-time">● En hora</span>`;
-      } else {
-        const live = rtMap.get(st.trip_id);
-        const nextStop = allStops.find(s => s.stop_id === live.stopPointRef);
-        if (nextStop && live.recordedAtTimeISO) {
-          const prevStop = allStops.filter(s=>s.stop_sequence<nextStop.stop_sequence).sort((a,b)=>b.stop_sequence-a.stop_sequence)[0];
-          const delay = computeBusDelay(prevStop, nextStop, prevStop?stopsData.get(prevStop.stop_id):null,
-                                        stopsData.get(nextStop.stop_id), live.lat, live.lon, live.recordedAtTimeISO);
-          if (delay !== null) {
-            estSec = timeToSeconds(st.departure_time) + delay;
-            const dm = Math.round(delay/60);
-            if      (dm >  1) delayPill = `<span class="delay-pill delay">+${dm}m</span>`;
-            else if (dm < -1) delayPill = `<span class="delay-pill advance">${dm}m</span>`;
-            else { isBusOnTime = true; delayPill = `<span class="delay-pill on-time">● En hora</span>`; }
+      if (applyRT && rtMap.has(st.trip_id)) {
+        const allStops = stopTimesData.filter(s => s.trip_id === st.trip_id).sort((a,b)=>a.stop_sequence-b.stop_sequence);
+        const firstDep = timeToSeconds(allStops[0]?.departure_time);
+        if (currentSec < firstDep) {
+          isBusOnTime = true;
+          delayPill = `<span class="delay-pill on-time">● En hora</span>`;
+        } else {
+          const live = rtMap.get(st.trip_id);
+          const nextStop = allStops.find(s => s.stop_id === live.stopPointRef);
+          if (nextStop && live.recordedAtTimeISO) {
+            const prevStop = allStops.filter(s=>s.stop_sequence<nextStop.stop_sequence).sort((a,b)=>b.stop_sequence-a.stop_sequence)[0];
+            const delay = computeBusDelay(prevStop, nextStop, prevStop?stopsData.get(prevStop.stop_id):null,
+                                          stopsData.get(nextStop.stop_id), live.lat, live.lon, live.recordedAtTimeISO);
+            if (delay !== null) {
+              estSec = timeToSeconds(st.departure_time) + delay;
+              const dm = Math.round(delay/60);
+              if      (dm >  1) delayPill = `<span class="delay-pill delay">+${dm}m</span>`;
+              else if (dm < -1) delayPill = `<span class="delay-pill advance">${dm}m</span>`;
+              else { isBusOnTime = true; delayPill = `<span class="delay-pill on-time">● En hora</span>`; }
+            }
           }
         }
       }
-    }
 
-    if (estSec >= currentSec) {
-      const liveEntry = rtMap.get(st.trip_id);
-      upcoming.push({
-        linea: trip.route_id, hora: st.departure_time,
-        estSec, estDisplay: secondsToTime(estSec), delayPill, isBusOnTime,
-        destino: trip.trip_headsign, trip_id: st.trip_id, shape_id: trip.shape_id,
-        vref: liveEntry?.vref || null
-      });
+      if (estSec >= fromSec) {
+        const liveEntry = applyRT ? rtMap.get(st.trip_id) : null;
+        results.push({
+          linea: trip.route_id, hora: st.departure_time,
+          estSec, estDisplay: secondsToTime(estSec), delayPill, isBusOnTime,
+          destino: trip.trip_headsign, trip_id: st.trip_id, shape_id: trip.shape_id,
+          vref: liveEntry?.vref || null
+        });
+      }
     }
+    results.sort((a,b) => a.estSec - b.estSec);
+    return results;
   }
 
-  upcoming.sort((a,b) => a.estSec - b.estSec);
+  // ── Get today's remaining trips ──
+  const upcoming = getScheduledTrips(currentDate, dow, currentSec, true);
+
+  // ── If fewer than 3, also get tomorrow's first trips ──
+  const TOMORROW_THRESHOLD = 3;
+  let tomorrowTrips = [];
+  if (upcoming.length < TOMORROW_THRESHOLD) {
+    const tmrDate = new Date();
+    tmrDate.setDate(tmrDate.getDate() + 1);
+    const tmrStr = `${tmrDate.getFullYear()}${String(tmrDate.getMonth()+1).padStart(2,'0')}${String(tmrDate.getDate()).padStart(2,'0')}`;
+    const tmrDow = tmrDate.getDay();
+    tomorrowTrips = getScheduledTrips(tmrStr, tmrDow, 0, false).slice(0, 10 - upcoming.length);
+  }
+
   const listEl = document.getElementById('bus-list');
 
-  if (!upcoming.length) {
-    listEl.innerHTML = '<div class="empty-state">No hay próximos buses programados hoy.</div>';
+  if (!upcoming.length && !tomorrowTrips.length) {
+    listEl.innerHTML = '<div class="empty-state">No hay próximos buses programados.</div>';
   } else {
     const stopInfo = stopsData.get(stopId);
     if (stopInfo) {
@@ -980,7 +998,7 @@ async function buscarBusesPorParada() {
       map.setView([stopInfo.stop_lat, stopInfo.stop_lon], 15);
     }
 
-    listEl.innerHTML = upcoming.slice(0,10).map(bus => {
+    const renderCard = bus => {
       const schedShort = bus.hora.substring(0,5);
       const estShort   = bus.estDisplay.substring(0,5);
       return `
@@ -995,7 +1013,18 @@ async function buscarBusesPorParada() {
             ${bus.delayPill}
           </div>
         </div>`;
-    }).join('');
+    };
+
+    let html = upcoming.slice(0, 10).map(renderCard).join('');
+
+    if (tomorrowTrips.length) {
+      html += `<div style="font-size:0.78rem;color:var(--ink-soft);margin:12px 0 8px;padding-top:10px;border-top:1px solid var(--border)">
+        Mañana
+      </div>`;
+      html += tomorrowTrips.map(renderCard).join('');
+    }
+
+    listEl.innerHTML = html;
   }
 }
 
