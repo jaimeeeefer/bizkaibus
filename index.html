@@ -223,30 +223,63 @@
 <script>
 
 // ═══════════════════════════════════════════════════════
-// AUTH
+// AUTH  (credenciales en variables de entorno de Cloudflare)
 // ═══════════════════════════════════════════════════════
-const USUARIO   = "admin";
-const CONTRASENA = "bizkaibus123";
-
-function handleLogin(e) {
+async function handleLogin(e) {
   e.preventDefault();
-  const u = document.getElementById('login-user').value.trim();
-  const p = document.getElementById('login-pass').value;
-  if (u === USUARIO && p === CONTRASENA) {
-    localStorage.setItem("autenticado", "true");
-    const overlay = document.getElementById('login-overlay');
-    overlay.style.opacity = '0';
-    overlay.style.transition = 'opacity 0.3s';
-    setTimeout(() => overlay.remove(), 300);
-  } else {
-    const err = document.getElementById('login-error');
-    err.textContent = 'Usuario o contraseña incorrectos.';
-    document.getElementById('login-pass').value = '';
+  const btn  = document.querySelector('.login-btn');
+  const err  = document.getElementById('login-error');
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+
+  btn.disabled = true;
+  btn.textContent = 'Comprobando…';
+  err.textContent = '';
+
+  try {
+    const res  = await fetch('/auth', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ user, pass })
+    });
+    const data = await res.json();
+
+    if (data.ok && data.token) {
+      localStorage.setItem('bkb_token', data.token);
+      const overlay = document.getElementById('login-overlay');
+      overlay.style.opacity = '0';
+      overlay.style.transition = 'opacity 0.3s';
+      setTimeout(() => overlay.remove(), 300);
+    } else {
+      err.textContent = data.error || 'Usuario o contraseña incorrectos.';
+      document.getElementById('login-pass').value = '';
+    }
+  } catch {
+    err.textContent = 'Error de conexión. Inténtalo de nuevo.';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Entrar →';
   }
 }
 
-if (localStorage.getItem("autenticado") === "true") {
-  document.getElementById('login-overlay').remove();
+async function verificarSesion() {
+  const token = localStorage.getItem('bkb_token');
+  if (!token) return false;
+  try {
+    const res = await fetch('/auth', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    return data.ok === true;
+  } catch { return false; }
+}
+
+async function initAuth() {
+  const valid = await verificarSesion();
+  if (valid) {
+    document.getElementById('login-overlay').remove();
+  }
+  // Si no es válido, el overlay ya está visible — el usuario tendrá que hacer login
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1489,6 +1522,8 @@ function toggleSidebar() {
 // INIT
 // ═══════════════════════════════════════════════════════
 window.onload = async () => {
+  // Verify session server-side (token stored in localStorage)
+  await initAuth();
   fetch('/bizkaibus').catch(()=>{});
   await Promise.all([cargarBusInfo(), cargarDatosGTFS()]);
   updateFavsUI();
