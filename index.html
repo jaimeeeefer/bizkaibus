@@ -503,16 +503,17 @@ async function cargarDatosGTFS() {
     });
   });
 
-  // Build line search index from routes.txt
+  // Build line search index from routes.txt (route_desc = "A3323-PORTUGALETE-GALDAMES")
   const routesText = await (await fetch(ROUTES_URL)).text();
   routesText.trim().split('\n').slice(1).forEach(line => {
     const r = line.replace(/\r/g, '').split(',');
-    if (r.length < 4) return;
+    if (r.length < 5) return;
     const route_id         = r[0]?.trim();
-    const route_short_name = r[2]?.trim();
-    const route_long_name  = r[3]?.trim();
-    if (!route_id || !route_short_name || !route_long_name) return;
-    const label = `${route_short_name} — ${route_long_name}`;
+    const route_short_name = r[2]?.trim(); // A3323 — used for searching
+    const route_desc       = r[4]?.trim(); // A3323-PORTUGALETE-GALDAMES
+    if (!route_id || !route_short_name || !route_desc) return;
+    // Display: replace first "-" with " — " → "A3323 — PORTUGALETE-GALDAMES"
+    const label = route_desc.replace('-', ' — ');
     lineSearchIndex.push({ route_id, route_short_name, label, labelLower: label.toLowerCase() });
   });
   lineSearchIndex.sort((a,b) => a.label.localeCompare(b.label));
