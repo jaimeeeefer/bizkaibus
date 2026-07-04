@@ -503,16 +503,17 @@ async function cargarDatosGTFS() {
     });
   });
 
-  // Build line search index from routes.txt (route_id + route_desc)
+  // Build line search index from routes.txt
   const routesText = await (await fetch(ROUTES_URL)).text();
   routesText.trim().split('\n').slice(1).forEach(line => {
-    const r = line.split(',');
+    const r = line.replace(/\r/g, '').split(',');
     if (r.length < 4) return;
-    const route_id   = r[0]?.trim();
-    const route_desc = r[3]?.trim(); // column index 3 = route_desc
-    if (!route_id || !route_desc) return;
-    const label = route_desc; // already formatted as "3323 — GALDAMES-PORTUGALETE"
-    lineSearchIndex.push({ route_id, label, labelLower: label.toLowerCase() });
+    const route_id         = r[0]?.trim();
+    const route_short_name = r[2]?.trim();
+    const route_long_name  = r[3]?.trim();
+    if (!route_id || !route_short_name || !route_long_name) return;
+    const label = `${route_short_name} — ${route_long_name}`;
+    lineSearchIndex.push({ route_id, route_short_name, label, labelLower: label.toLowerCase() });
   });
   lineSearchIndex.sort((a,b) => a.label.localeCompare(b.label));
 
@@ -576,16 +577,16 @@ function onLineaInput() {
   if (!results.length) { ac.style.display = 'none'; return; }
 
   ac.innerHTML = results.map(l =>
-    `<div class="autocomplete-item" onmousedown="selectLinea('${l.route_id.replace(/'/g,"\\'")}')">
+    `<div class="autocomplete-item" onmousedown="selectLinea('${l.route_short_name.replace(/'/g,"\\'")}')">
       ${l.label}
     </div>`
   ).join('');
   ac.style.display = 'block';
 }
 
-function selectLinea(routeId) {
-  document.getElementById('linea').value = routeId;
-  toggleClear('clear-linea', routeId);
+function selectLinea(routeShortName) {
+  document.getElementById('linea').value = routeShortName;
+  toggleClear('clear-linea', routeShortName);
   closeLineaAutocomplete();
 }
 
