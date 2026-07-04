@@ -112,10 +112,13 @@
 
       <!-- Tab: Línea -->
       <div class="search-input-wrap active" id="wrap-linea">
-        <div class="search-input-row">
+        <div class="search-input-row" style="position:relative">
           <span class="search-icon">🔍</span>
-          <input type="text" id="linea" placeholder="Ej: A3935 o 3935" oninput="toggleClear('clear-linea',this.value)" />
+          <input type="text" id="linea" placeholder="Nº o nombre de línea…"
+                 oninput="toggleClear('clear-linea',this.value);onLineaInput()"
+                 onblur="setTimeout(()=>closeLineaAutocomplete(),200)" />
           <button class="clear-btn" id="clear-linea" onmousedown="event.preventDefault();clearInput('linea','clear-linea')" title="Borrar">✕</button>
+          <div id="linea-autocomplete"></div>
         </div>
         <button class="search-btn" onclick="buscarBusesPorLinea()">Ver buses en mapa</button>
       </div>
@@ -311,6 +314,7 @@ const STOP_TIMES2_URL    = "https://raw.githubusercontent.com/jaimeeeefer/bizkai
 const STOP_TIMES3_URL    = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/stop_times3.txt";
 const STOP_TIMES4_URL    = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/stop_times4.txt";
 const TRIPS_URL          = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/trips.txt";
+const ROUTES_URL         = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/routes.txt";
 const CALENDAR_URL       = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/calendar.txt";
 const CALENDAR_DATES_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/main/datos/calendar_dates.txt";
 
@@ -399,6 +403,7 @@ let tripsData        = new Map();
 let calendarData     = new Map();
 let calendarDatesData = new Map();
 let stopsSearchIndex = [];
+let lineSearchIndex  = []; // [{route_id, headsign, label, labelLower}]
 
 // ═══════════════════════════════════════════════════════
 // LOADING UI
@@ -498,6 +503,19 @@ async function cargarDatosGTFS() {
     });
   });
 
+  // Build line search index from routes.txt (route_id + route_desc)
+  const routesText = await (await fetch(ROUTES_URL)).text();
+  routesText.trim().split('\n').slice(1).forEach(line => {
+    const r = line.split(',');
+    if (r.length < 4) return;
+    const route_id   = r[0]?.trim();
+    const route_desc = r[3]?.trim(); // column index 3 = route_desc
+    if (!route_id || !route_desc) return;
+    const label = route_desc; // already formatted as "3323 — GALDAMES-PORTUGALETE"
+    lineSearchIndex.push({ route_id, label, labelLower: label.toLowerCase() });
+  });
+  lineSearchIndex.sort((a,b) => a.label.localeCompare(b.label));
+
   (await (await fetch(CALENDAR_URL)).text()).trim().split('\n').slice(1).forEach(line => {
     const r = line.split(',');
     if (r.length >= 10) calendarData.set(r[0]?.trim(), {
@@ -544,6 +562,36 @@ async function cargarBusInfo() {
       });
     });
   } catch(e) { console.warn('busInfo error', e); }
+}
+
+// ═══════════════════════════════════════════════════════
+// LINE AUTOCOMPLETE
+// ═══════════════════════════════════════════════════════
+function onLineaInput() {
+  const q = document.getElementById('linea').value.trim().toLowerCase();
+  if (q.length < 2) { closeLineaAutocomplete(); return; }
+
+  const results = lineSearchIndex.filter(l => l.labelLower.includes(q)).slice(0, 8);
+  const ac = document.getElementById('linea-autocomplete');
+  if (!results.length) { ac.style.display = 'none'; return; }
+
+  ac.innerHTML = results.map(l =>
+    `<div class="autocomplete-item" onmousedown="selectLinea('${l.route_id.replace(/'/g,"\\'")}')">
+      ${l.label}
+    </div>`
+  ).join('');
+  ac.style.display = 'block';
+}
+
+function selectLinea(routeId) {
+  document.getElementById('linea').value = routeId;
+  toggleClear('clear-linea', routeId);
+  closeLineaAutocomplete();
+}
+
+function closeLineaAutocomplete() {
+  const ac = document.getElementById('linea-autocomplete');
+  if (ac) ac.style.display = 'none';
 }
 
 // ═══════════════════════════════════════════════════════
