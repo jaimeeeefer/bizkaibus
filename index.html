@@ -573,6 +573,11 @@ function onLineaInput() {
   const q = document.getElementById('linea').value.trim().toLowerCase();
   if (q.length < 2) { closeLineaAutocomplete(); return; }
 
+  if (/^\d+$/.test(q)) {
+    closeLineaAutocomplete();
+    return;
+  }
+
   const results = lineSearchIndex.filter(l => l.labelLower.includes(q)).slice(0, 8);
   const ac = document.getElementById('linea-autocomplete');
   if (!results.length) { ac.style.display = 'none'; return; }
