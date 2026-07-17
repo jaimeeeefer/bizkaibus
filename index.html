@@ -760,6 +760,53 @@ async function buscarBusesPorLinea() {
     const found = [];
     const bounds = new L.LatLngBounds();
 
+    // Draw line paths
+    const routeIds = new Set(lineSearchIndex.filter(l => l.route_short_name.toUpperCase() === lastLineSearch || l.route_id.toUpperCase() === lastLineSearch).map(l => l.route_id));
+    if (routeIds.size > 0) {
+      const matchingTrips = new Set();
+      for (const [tripId, tripInfo] of tripsData.entries()) {
+        if (routeIds.has(tripInfo.route_id)) matchingTrips.add(tripId);
+      }
+      
+      const tripStopsMap = new Map();
+      for (let i=0; i<stopTimesData.length; i++) {
+        const st = stopTimesData[i];
+        if (matchingTrips.has(st.trip_id)) {
+          let arr = tripStopsMap.get(st.trip_id);
+          if (!arr) { arr = []; tripStopsMap.set(st.trip_id, arr); }
+          arr.push(st);
+        }
+      }
+
+      const tripsByHeadsign = new Map();
+      for (const tripId of matchingTrips) {
+        const tripInfo = tripsData.get(tripId);
+        const headsign = tripInfo.trip_headsign || 'Unknown';
+        const stopsArr = tripStopsMap.get(tripId) || [];
+        const count = stopsArr.length;
+        if (!tripsByHeadsign.has(headsign) || count > (tripsByHeadsign.get(headsign).count || 0)) {
+          tripsByHeadsign.set(headsign, { tripId, count });
+        }
+      }
+
+      for (const {tripId} of tripsByHeadsign.values()) {
+        const tripStops = tripStopsMap.get(tripId) || [];
+        tripStops.sort((a,b) => a.stop_sequence - b.stop_sequence);
+        const latlngs = [];
+        for (const st of tripStops) {
+          const s = stopsData.get(st.stop_id);
+          if (s && s.stop_lat && s.stop_lon) {
+            latlngs.push([s.stop_lat, s.stop_lon]);
+            bounds.extend([s.stop_lat, s.stop_lon]);
+          }
+        }
+        if (latlngs.length > 1) {
+          const polyline = L.polyline(latlngs, {color: '#1565C0', weight: 4, opacity: 0.5}).addTo(map);
+          linePolylines.push(polyline);
+        }
+      }
+    }
+
     for (const act of xml.getElementsByTagName('VehicleActivity')) {
       const jref = act.querySelector('VehicleJourneyRef')?.textContent.trim().toUpperCase();
       const vref = act.querySelector('VehicleRef')?.textContent.trim();
@@ -790,11 +837,12 @@ async function buscarBusesPorLinea() {
       found.push({ lineaLimpia, paradaTxt, sp, vref, abrev });
     }
 
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [50,50] });
+
     const listEl = document.getElementById('line-bus-list');
     if (!found.length) {
       listEl.innerHTML = '<div class="empty-state">No hay buses en tiempo real para esta línea.</div>';
     } else {
-      if (bounds.isValid()) map.fitBounds(bounds, { padding: [50,50] });
       listEl.innerHTML = found.map(b => `
         <div class="bus-list-item" onclick="rellenarYBuscarBus('${b.vref}')">
           <span class="badge">${b.lineaLimpia}</span>
