@@ -20,7 +20,8 @@ export async function onRequestPost(context) {
   }
 
   // Token simple: base64(payload) + "." + HMAC-SHA256
-  const payload = JSON.stringify({ user, exp: Date.now() + 1000 * 60 * 60 * 24 * 30 }); // 30 días
+  // Set expiration to 60 days
+  const payload = JSON.stringify({ user, exp: Date.now() + 1000 * 60 * 60 * 24 * 60 }); 
   const token   = await sign(payload, env.AUTH_SECRET);
 
   return json({ ok: true, token });
@@ -62,6 +63,7 @@ async function verify(token, secret) {
     if (!b64p || !b64s) return false;
     const payload = atob(b64p);
     const data    = JSON.parse(payload);
+    // Verificar si el token ha expirado
     if (Date.now() > data.exp) return false;          // expirado
 
     const enc = new TextEncoder();
