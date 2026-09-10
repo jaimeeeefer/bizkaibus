@@ -1150,8 +1150,10 @@ async function buscarBusesPorParada() {
     let fHtml = '';
     const sortedLines = Array.from(uniqueLines).sort();
     sortedLines.forEach(line => {
+      const hasSelection = window.selectedStopLines.size > 0;
       const isActive = window.selectedStopLines.has(line);
-      fHtml += `<button class="line-filter-btn" onclick="toggleStopLineFilter('${line}')" style="padding: 3px 10px; border-radius: 12px; border: 1px solid ${isActive ? 'var(--accent)' : 'var(--border)'}; background: ${isActive ? 'var(--accent)' : 'transparent'}; color: ${isActive ? '#fff' : 'var(--ink)'}; cursor: pointer; white-space: nowrap; font-size: 0.8rem; font-family: inherit; font-weight: 600;">${line}</button>`;
+      const isFaded = hasSelection && !isActive;
+      fHtml += `<button class="bus-badge" onclick="toggleStopLineFilter('${line}')" style="cursor: pointer; border: none; opacity: ${isFaded ? '0.4' : '1'}; transition: opacity 0.15s;">${line}</button>`;
     });
     filtersContainer.innerHTML = fHtml;
 
