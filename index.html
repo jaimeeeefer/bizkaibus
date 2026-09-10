@@ -1156,19 +1156,22 @@ async function buscarBusesPorParada() {
       fHtml += `<button class="bus-badge" onclick="toggleStopLineFilter('${line}')" style="cursor: pointer; border: none; opacity: ${isFaded ? '0.4' : '1'}; transition: opacity 0.15s;">${line}</button>`;
     });
     filtersContainer.innerHTML = fHtml;
-
-    // Adjust layout dynamically based on title height
-    const titleEl = document.getElementById('stop-results-title');
+    
+    // Default to 1 row
+    filtersContainer.style.display = 'flex';
+    filtersContainer.style.flexDirection = 'row';
+    filtersContainer.style.alignItems = 'center';
+    filtersContainer.style.gridTemplateRows = '';
+    filtersContainer.style.alignContent = '';
+    filtersContainer.style.gridAutoFlow = '';
+    
     const actionsContainer = document.querySelector('#stop-results .panel-heading-actions');
-    
-    // Calculate if title spans more than 1 line regardless of device font scaling
-    const computed = window.getComputedStyle(titleEl);
-    const fontSize = parseFloat(computed.fontSize);
-    const lineHeight = parseFloat(computed.lineHeight) || (fontSize * 1.2);
-    const isMultiLine = titleEl.offsetHeight > (lineHeight * 1.5);
-    
-    
-    if (isMultiLine) {
+    actionsContainer.style.flexDirection = 'row';
+
+    // Measure available width
+    const containerWidth = filtersContainer.offsetWidth;
+    // If we have multiple lines but there's no room for 2 badges horizontally (approx 115px)
+    if (sortedLines.length > 1 && containerWidth > 0 && containerWidth < 115) {
       filtersContainer.style.display = 'grid';
       filtersContainer.style.gridTemplateRows = 'auto auto';
       filtersContainer.style.alignContent = 'center';
@@ -1176,15 +1179,6 @@ async function buscarBusesPorParada() {
       filtersContainer.style.flexDirection = '';
       
       actionsContainer.style.flexDirection = 'column';
-    } else {
-      filtersContainer.style.display = 'flex';
-      filtersContainer.style.flexDirection = 'row';
-      filtersContainer.style.alignItems = 'center';
-      filtersContainer.style.gridTemplateRows = '';
-      filtersContainer.style.alignContent = '';
-      filtersContainer.style.gridAutoFlow = '';
-      
-      actionsContainer.style.flexDirection = 'row';
     }
 
     // 2. Filter trips
