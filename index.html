@@ -160,12 +160,12 @@
 
       <!-- Stop results -->
       <div id="stop-results" style="display:none">
-        <div class="panel-heading" style="justify-content: flex-start; flex-wrap: wrap; gap: 6px;">
-          <span id="stop-results-title" style="margin-right: 2px;">Próximos buses</span>
-          <div id="stop-line-filters" style="display: contents;">
+        <div class="panel-heading" style="display: flex; gap: 8px; align-items: center;">
+          <span id="stop-results-title" style="flex: 1 1 auto; max-width: 45%; word-break: break-word;">Próximos buses</span>
+          <div id="stop-line-filters" style="display: grid; grid-template-rows: auto auto; align-content: center; grid-auto-flow: column; gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1 1 auto; padding-bottom: 2px;">
             <!-- Filtros de linea -->
           </div>
-          <div class="panel-heading-actions" style="margin-left: auto; flex-shrink:0;">
+          <div class="panel-heading-actions" style="flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px;">
             <button class="btn-panel-action share-btn" id="btn-share-stop" onclick="compartirParada()" title="Compartir parada">🔗</button>
             <button class="btn-panel-action" id="btn-fav-stop" onclick="addFavoriteStop()" title="Guardar parada">⭐</button>
           </div>
