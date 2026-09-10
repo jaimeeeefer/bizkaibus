@@ -160,12 +160,12 @@
 
       <!-- Stop results -->
       <div id="stop-results" style="display:none">
-        <div class="panel-heading" style="display: flex; gap: 8px; align-items: center;">
-          <span id="stop-results-title" style="flex: 0 1 auto; min-width: 0; word-break: break-word;">Próximos buses</span>
-          <div id="stop-line-filters" style="gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1 1 auto; min-width: 0; padding-bottom: 2px;">
+        <div class="panel-heading" style="display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center;">
+          <span id="stop-results-title" style="min-width: 0; overflow-wrap: break-word;">Próximos buses</span>
+          <div id="stop-line-filters" style="min-width: 0; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px;">
             <!-- Filtros de linea -->
           </div>
-          <div class="panel-heading-actions" style="flex: 0 0 auto; display: flex; gap: 6px;">
+          <div class="panel-heading-actions" style="display: flex; gap: 6px;">
             <button class="btn-panel-action share-btn" id="btn-share-stop" onclick="compartirParada()" title="Compartir parada">🔗</button>
             <button class="btn-panel-action" id="btn-fav-stop" onclick="addFavoriteStop()" title="Guardar parada">⭐</button>
           </div>
@@ -1164,7 +1164,6 @@ async function buscarBusesPorParada() {
     filtersContainer.style.gridTemplateRows = '';
     filtersContainer.style.alignContent = '';
     filtersContainer.style.gridAutoFlow = '';
-    filtersContainer.style.flex = '1 1 0px';
     filtersContainer.style.minWidth = '0';
     
     const actionsContainer = document.querySelector('#stop-results .panel-heading-actions');
