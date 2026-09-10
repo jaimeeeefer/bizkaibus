@@ -1158,10 +1158,15 @@ async function buscarBusesPorParada() {
     filtersContainer.innerHTML = fHtml;
 
     // Adjust layout dynamically based on title height
-    // A single line title is usually < 35px. If it wraps, it's > 35px.
     const titleEl = document.getElementById('stop-results-title');
     const actionsContainer = document.querySelector('#stop-results .panel-heading-actions');
-    const isMultiLine = titleEl.offsetHeight > 35;
+    
+    // Calculate if title spans more than 1 line regardless of device font scaling
+    const computed = window.getComputedStyle(titleEl);
+    const fontSize = parseFloat(computed.fontSize);
+    const lineHeight = parseFloat(computed.lineHeight) || (fontSize * 1.2);
+    const isMultiLine = titleEl.offsetHeight > (lineHeight * 1.5);
+    
     
     if (isMultiLine) {
       filtersContainer.style.display = 'grid';
