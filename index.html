@@ -160,12 +160,12 @@
 
       <!-- Stop results -->
       <div id="stop-results" style="display:none">
-        <div class="panel-heading" style="display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center;">
-          <span id="stop-results-title" style="min-width: 0; overflow-wrap: break-word;">Próximos buses</span>
-          <div id="stop-line-filters" style="min-width: 0; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px;">
+        <div class="panel-heading" style="display: flex; gap: 8px; align-items: center;">
+          <span id="stop-results-title" style="flex: 0 1 auto; max-width: 45%; word-break: break-word;">Próximos buses</span>
+          <div id="stop-line-filters" style="gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1 1 auto; padding-bottom: 2px;">
             <!-- Filtros de linea -->
           </div>
-          <div class="panel-heading-actions" style="display: flex; gap: 6px;">
+          <div class="panel-heading-actions" style="flex: 0 0 auto; display: flex; gap: 6px;">
             <button class="btn-panel-action share-btn" id="btn-share-stop" onclick="compartirParada()" title="Compartir parada">🔗</button>
             <button class="btn-panel-action" id="btn-fav-stop" onclick="addFavoriteStop()" title="Guardar parada">⭐</button>
           </div>
@@ -1157,7 +1157,7 @@ async function buscarBusesPorParada() {
     });
     filtersContainer.innerHTML = fHtml;
     
-    // Default to 1 row and allow filters to shrink completely to measure natural title width
+    // Default to 1 row
     filtersContainer.style.display = 'flex';
     filtersContainer.style.flexDirection = 'row';
     filtersContainer.style.alignItems = 'center';
@@ -1165,15 +1165,21 @@ async function buscarBusesPorParada() {
     filtersContainer.style.alignContent = '';
     filtersContainer.style.gridAutoFlow = '';
     filtersContainer.style.minWidth = '0';
+    filtersContainer.style.flex = '1 1 0px'; // Allow flex calculation
+    
+    const titleEl = document.getElementById('stop-results-title');
+    titleEl.style.maxWidth = '100%'; // Default no restriction
     
     const actionsContainer = document.querySelector('#stop-results .panel-heading-actions');
     actionsContainer.style.flexDirection = 'row';
 
-    // Measure available width for filters when title takes its natural size
+    // Measure available width for filters
     const containerWidth = filtersContainer.offsetWidth;
     
     // If there's no room for 2 badges horizontally (approx 115px), switch to 2 rows
-    if (sortedLines.length > 1 && containerWidth < 115) {
+    if (sortedLines.length > 1 && containerWidth > 0 && containerWidth < 115) {
+      titleEl.style.maxWidth = '45%'; // Apply constraint to reduce gap
+      
       filtersContainer.style.display = 'grid';
       filtersContainer.style.gridTemplateRows = 'auto auto';
       filtersContainer.style.alignContent = 'center';
@@ -1183,7 +1189,6 @@ async function buscarBusesPorParada() {
       
       actionsContainer.style.flexDirection = 'column';
     } else {
-      // 1 row is fine, but enforce min-width so buttons don't get squished if window resizes
       filtersContainer.style.minWidth = '115px';
     }
 
