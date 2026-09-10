@@ -161,10 +161,13 @@
       <!-- Stop results -->
       <div id="stop-results" style="display:none">
         <div class="panel-heading">
-          <span id="stop-results-title">Próximos buses</span>
-          <div class="panel-heading-actions">
-            <button class="btn-panel-action share-btn" id="btn-share-stop" onclick="compartirParada()" title="Compartir parada">🔗 Compartir</button>
-            <button class="btn-panel-action" id="btn-fav-stop" onclick="addFavoriteStop()">⭐ Guardar</button>
+          <span id="stop-results-title" style="flex-shrink:0;">Próximos buses</span>
+          <div id="stop-line-filters" style="display:flex; overflow-x:auto; gap:6px; padding:0 8px; flex-grow:1; scrollbar-width:none;">
+            <!-- Filtros de linea -->
+          </div>
+          <div class="panel-heading-actions" style="flex-shrink:0;">
+            <button class="btn-panel-action share-btn" id="btn-share-stop" onclick="compartirParada()" title="Compartir parada">🔗</button>
+            <button class="btn-panel-action" id="btn-fav-stop" onclick="addFavoriteStop()" title="Guardar parada">⭐</button>
           </div>
         </div>
         <div id="bus-list"></div>
@@ -662,8 +665,8 @@ function showPanel(name) {
   btnShareStop.style.display  = name === 'stop' ? 'inline-block' : 'none';
   btnShareLinea.style.display = name === 'line' ? 'inline-block' : 'none';
 
-  if (name === 'stop') { btnFavStop.textContent  = '⭐ Guardar'; btnFavStop.classList.remove('saved');  }
-  if (name === 'line') { btnFavLinea.textContent = '⭐ Guardar'; btnFavLinea.classList.remove('saved'); }
+  if (name === 'stop') { btnFavStop.textContent  = '⭐'; btnFavStop.classList.remove('saved');  }
+  if (name === 'line') { btnFavLinea.textContent = '⭐'; btnFavLinea.classList.remove('saved'); }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1018,13 +1021,16 @@ async function buscarBusesPorParada() {
   }
   if (!stopId) return alert('Selecciona una parada de la lista de sugerencias.');
   if (!stopsData.has(stopId)) return alert('Parada no encontrada.');
+  if (currentStopId !== stopId) {
+    window.selectedStopLines = new Set();
+  }
   currentStopId = stopId;
 
   clearLineMarkers(); clearMapElements();
   showPanel('stop');
   if (getFavs().find(f => f.type==='stop' && f.id===stopId)) {
     const btn = document.getElementById('btn-fav-stop');
-    btn.textContent = '✓ Guardada'; btn.classList.add('saved');
+    btn.textContent = '✓'; btn.classList.add('saved');
   }
   const stopName = getCleanStopName(stopId);
   document.getElementById('stop-results-title').textContent = stopName;
@@ -1049,6 +1055,8 @@ async function buscarBusesPorParada() {
       });
     }
   } catch(e) { console.warn('RT fetch failed', e); }
+
+
 
   // ── Helper: get scheduled trips for a stop on a given date/dow ──
   function getScheduledTrips(dateStr, dayOfWeek, fromSec, applyRT) {
@@ -1107,33 +1115,65 @@ async function buscarBusesPorParada() {
     return results;
   }
 
-  // ── Get today's trips (from 15 mins ago) ──
+  // ── Pre-calculate today's trips (from 15 mins ago) ──
   const allTrips = getScheduledTrips(currentDate, dow, currentSec - 15 * 60, true);
-  const pastTrips = allTrips.filter(t => t.estSec < currentSec);
-  const upcoming = allTrips.filter(t => t.estSec >= currentSec);
 
-  // ── If fewer than 3, also get tomorrow's first trips ──
-  const TOMORROW_THRESHOLD = 3;
-  let tomorrowTrips = [];
-  if (upcoming.length < TOMORROW_THRESHOLD) {
-    const tmrDate = new Date();
-    tmrDate.setDate(tmrDate.getDate() + 1);
-    const tmrStr = `${tmrDate.getFullYear()}${String(tmrDate.getMonth()+1).padStart(2,'0')}${String(tmrDate.getDate()).padStart(2,'0')}`;
-    const tmrDow = tmrDate.getDay();
-    tomorrowTrips = getScheduledTrips(tmrStr, tmrDow, 0, false).slice(0, 10 - upcoming.length);
+  // ── Pre-calculate tomorrow's first trips (generous amount for filtering) ──
+  const tmrDate = new Date();
+  tmrDate.setDate(tmrDate.getDate() + 1);
+  const tmrStr = `${tmrDate.getFullYear()}${String(tmrDate.getMonth()+1).padStart(2,'0')}${String(tmrDate.getDate()).padStart(2,'0')}`;
+  const tmrDow = tmrDate.getDay();
+  const allTomorrowTrips = getScheduledTrips(tmrStr, tmrDow, 0, false).slice(0, 50);
+
+  // ── Collect unique lines ──
+  const uniqueLines = new Set();
+  allTrips.forEach(t => uniqueLines.add(t.linea));
+  allTomorrowTrips.forEach(t => uniqueLines.add(t.linea));
+
+  const stopInfo = stopsData.get(stopId);
+  if (stopInfo) {
+    const mk = L.marker([stopInfo.stop_lat, stopInfo.stop_lon], { icon: stopIcon }).addTo(map);
+    mk.bindPopup(`<b>Parada:</b> ${stopName} (${stopId})`).openPopup();
+    stopMarkers.push(mk);
+    map.setView([stopInfo.stop_lat, stopInfo.stop_lon], 15);
   }
 
-  const listEl = document.getElementById('bus-list');
+  window.toggleStopLineFilter = (line) => {
+    if (window.selectedStopLines.has(line)) window.selectedStopLines.delete(line);
+    else window.selectedStopLines.add(line);
+    window.renderStopResults();
+  };
 
-  if (!upcoming.length && !tomorrowTrips.length) {
-    listEl.innerHTML = '<div class="empty-state">No hay próximos buses programados.</div>';
-  } else {
-    const stopInfo = stopsData.get(stopId);
-    if (stopInfo) {
-      const mk = L.marker([stopInfo.stop_lat, stopInfo.stop_lon], { icon: stopIcon }).addTo(map);
-      mk.bindPopup(`<b>Parada:</b> ${stopName} (${stopId})`).openPopup();
-      stopMarkers.push(mk);
-      map.setView([stopInfo.stop_lat, stopInfo.stop_lon], 15);
+  window.renderStopResults = () => {
+    // 1. Render filters
+    const filtersContainer = document.getElementById('stop-line-filters');
+    let fHtml = '';
+    const sortedLines = Array.from(uniqueLines).sort();
+    sortedLines.forEach(line => {
+      const isActive = window.selectedStopLines.has(line);
+      fHtml += `<button class="line-filter-btn" onclick="toggleStopLineFilter('${line}')" style="padding: 3px 10px; border-radius: 12px; border: 1px solid ${isActive ? 'var(--accent)' : 'var(--border)'}; background: ${isActive ? 'var(--accent)' : 'transparent'}; color: ${isActive ? '#fff' : 'var(--ink)'}; cursor: pointer; white-space: nowrap; font-size: 0.8rem; font-family: inherit; font-weight: 600;">${line}</button>`;
+    });
+    filtersContainer.innerHTML = fHtml;
+
+    // 2. Filter trips
+    const isFiltered = window.selectedStopLines.size > 0;
+    const filteredAllTrips = isFiltered ? allTrips.filter(t => window.selectedStopLines.has(t.linea)) : allTrips;
+    const filteredTomorrowTrips = isFiltered ? allTomorrowTrips.filter(t => window.selectedStopLines.has(t.linea)) : allTomorrowTrips;
+
+    const pastTrips = filteredAllTrips.filter(t => t.estSec < currentSec);
+    const upcoming = filteredAllTrips.filter(t => t.estSec >= currentSec);
+
+    let displayUpcoming = upcoming.slice(0, 20);
+    let displayTomorrow = [];
+    if (displayUpcoming.length < 20) {
+      displayTomorrow = filteredTomorrowTrips.slice(0, 20 - displayUpcoming.length);
+    }
+
+    const listEl = document.getElementById('bus-list');
+
+    if (!displayUpcoming.length && !displayTomorrow.length && !pastTrips.length) {
+      listEl.innerHTML = '<div class="empty-state">No hay buses para esta selección.</div>';
+      return;
     }
 
     const renderCard = bus => {
@@ -1154,7 +1194,6 @@ async function buscarBusesPorParada() {
     };
 
     let html = '';
-
     if (pastTrips.length > 0) {
       const pastHtml = pastTrips.map(renderCard).join('');
       html += `
@@ -1174,17 +1213,19 @@ async function buscarBusesPorParada() {
       `;
     }
 
-    html += upcoming.slice(0, 10).map(renderCard).join('');
+    html += displayUpcoming.map(renderCard).join('');
 
-    if (tomorrowTrips.length) {
+    if (displayTomorrow.length) {
       html += `<div style="font-size:0.78rem;color:var(--ink-soft);margin:12px 0 8px;padding-top:10px;border-top:1px solid var(--border)">
         Mañana
       </div>`;
-      html += tomorrowTrips.map(renderCard).join('');
+      html += displayTomorrow.map(renderCard).join('');
     }
 
     listEl.innerHTML = html;
-  }
+  };
+
+  window.renderStopResults();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1548,7 +1589,7 @@ function addFavoriteStop() {
     favs.push({ type:'stop', id: currentStopId, label: `🚏 ${name} (${currentStopId})` });
     saveFavs(favs); updateFavsUI();
   }
-  btn.textContent = '✓ Guardada'; btn.classList.add('saved');
+  btn.textContent = '✓'; btn.classList.add('saved');
 }
 
 function addFavoriteLine() {
@@ -1564,7 +1605,7 @@ function addFavoriteLine() {
     favs.push({ type:'line', id: lastLineSearch, label: `🚌 Línea ${lastLineSearch}` });
     saveFavs(favs); updateFavsUI();
   }
-  btn.textContent = '✓ Guardada'; btn.classList.add('saved');
+  btn.textContent = '✓'; btn.classList.add('saved');
 }
 
 function removeFav(idx) {
