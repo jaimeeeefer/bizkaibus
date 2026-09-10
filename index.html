@@ -161,7 +161,7 @@
       <!-- Stop results -->
       <div id="stop-results" style="display:none">
         <div class="panel-heading" style="display: flex; gap: 8px; align-items: center;">
-          <span id="stop-results-title" style="flex: 0 1 auto; max-width: 45%; word-break: break-word;">Próximos buses</span>
+          <span id="stop-results-title" style="flex: 0 1 auto; min-width: 0; word-break: normal; overflow-wrap: break-word;">Próximos buses</span>
           <div id="stop-line-filters" style="gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1 1 auto; padding-bottom: 2px;">
             <!-- Filtros de linea -->
           </div>
@@ -1176,18 +1176,18 @@ async function buscarBusesPorParada() {
     // Measure available width for filters
     const containerWidth = filtersContainer.offsetWidth;
     
-    // If there's no room for 2 badges horizontally (approx 90px), switch to 2 rows
-    if (sortedLines.length > 2 && containerWidth > 0 && containerWidth < 90) {
+    // If there's no room for 2 badges horizontally (approx 115px), switch to 2 rows
+    if (sortedLines.length > 1 && containerWidth > 0 && containerWidth < 115) {
       filtersContainer.style.display = 'grid';
       filtersContainer.style.gridTemplateRows = 'auto auto';
       filtersContainer.style.alignContent = 'center';
       filtersContainer.style.gridAutoFlow = 'column';
       filtersContainer.style.flexDirection = '';
-      filtersContainer.style.minWidth = '90px';
+      filtersContainer.style.minWidth = '115px';
       
       actionsContainer.style.flexDirection = 'column';
     } else {
-      filtersContainer.style.minWidth = '90px';
+      filtersContainer.style.minWidth = '115px';
     }
 
     // 2. Filter trips
