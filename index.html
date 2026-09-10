@@ -1107,8 +1107,10 @@ async function buscarBusesPorParada() {
     return results;
   }
 
-  // ── Get today's remaining trips ──
-  const upcoming = getScheduledTrips(currentDate, dow, currentSec, true);
+  // ── Get today's trips (from 15 mins ago) ──
+  const allTrips = getScheduledTrips(currentDate, dow, currentSec - 15 * 60, true);
+  const pastTrips = allTrips.filter(t => t.estSec < currentSec);
+  const upcoming = allTrips.filter(t => t.estSec >= currentSec);
 
   // ── If fewer than 3, also get tomorrow's first trips ──
   const TOMORROW_THRESHOLD = 3;
@@ -1151,7 +1153,28 @@ async function buscarBusesPorParada() {
         </div>`;
     };
 
-    let html = upcoming.slice(0, 10).map(renderCard).join('');
+    let html = '';
+
+    if (pastTrips.length > 0) {
+      const pastHtml = pastTrips.map(renderCard).join('');
+      html += `
+        <button id="toggle-past-btn" style="width:100%; margin-bottom:12px; padding:8px; background:transparent; border:1px solid var(--border); border-radius:8px; color:var(--ink-soft); font-weight:600; cursor:pointer; font-family:inherit; transition: background 0.15s;" onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background='transparent'" onclick="
+          const c = document.getElementById('past-trips-container');
+          if (c.style.display === 'none') {
+            c.style.display = 'block';
+            this.textContent = 'Ocultar salidas anteriores';
+          } else {
+            c.style.display = 'none';
+            this.textContent = 'Salidas anteriores';
+          }
+        ">Salidas anteriores</button>
+        <div id="past-trips-container" style="display:none; opacity:0.6; margin-bottom:12px;">
+          ${pastHtml}
+        </div>
+      `;
+    }
+
+    html += upcoming.slice(0, 10).map(renderCard).join('');
 
     if (tomorrowTrips.length) {
       html += `<div style="font-size:0.78rem;color:var(--ink-soft);margin:12px 0 8px;padding-top:10px;border-top:1px solid var(--border)">
