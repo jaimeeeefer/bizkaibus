@@ -1737,20 +1737,44 @@ function updateApiUpdateUI() {
   span.style.display = 'inline';
   
   if (diffMins >= 10) {
-    span.style.color = '#e53935'; // Red if > 10 mins
+    span.style.color = '#e53935';
+    span.style.textDecoration = 'underline dotted';
+    span.style.textUnderlineOffset = '4px';
     span.style.cursor = 'pointer';
-    span.onclick = () => {
-      L.popup()
-        .setLatLng(map.getCenter())
-        .setContent("<strong>¡Atención!</strong><br>El servidor de Bizkaibus probablemente se haya caído.<br>Los tiempos y posiciones mostrados podrían no estar actualizados.")
-        .openOn(map);
+    span.onclick = (e) => {
+      e.stopPropagation();
+      let popup = document.getElementById('api-alert-popup');
+      if (!popup) {
+        popup = document.createElement('div');
+        popup.id = 'api-alert-popup';
+        popup.style.cssText = 'position:absolute; top:35px; right:0; width:260px; background:white; padding:12px; border-radius:12px; box-shadow:0 3px 14px rgba(0,0,0,0.4); z-index:9999; color:#333; font-size:14px; line-height:1.4; text-align:left; cursor:default; text-decoration:none; text-transform:none; font-weight:normal; font-family:sans-serif;';
+        popup.innerHTML = `
+          <div style="position:absolute; top:-5px; right:20px; width:12px; height:12px; background:white; transform:rotate(45deg); box-shadow:-2px -2px 3px rgba(0,0,0,0.1);"></div>
+          <a href="#" onclick="document.getElementById('api-alert-popup').style.display='none'; return false;" style="position:absolute; top:8px; right:8px; color:#777; text-decoration:none; font-size:16px; font-weight:bold; line-height:1;">×</a>
+          <strong>¡Atención!</strong><br><br>El servidor de Bizkaibus probablemente se haya caído.<br><br>Los tiempos y posiciones mostrados podrían no estar actualizados.
+        `;
+        span.style.position = 'relative';
+        span.appendChild(popup);
+      }
+      popup.style.display = popup.style.display === 'none' ? 'block' : 'none';
     };
   } else {
-    span.style.color = ''; // Default
+    span.style.color = '';
+    span.style.textDecoration = 'none';
     span.style.cursor = 'default';
     span.onclick = null;
+    const popup = document.getElementById('api-alert-popup');
+    if (popup) popup.style.display = 'none';
   }
 }
+
+// Close popup if clicking outside
+document.addEventListener('click', (e) => {
+  const popup = document.getElementById('api-alert-popup');
+  if (popup && popup.style.display !== 'none' && !e.target.closest('#api-last-updated')) {
+    popup.style.display = 'none';
+  }
+});
 
 window.addEventListener('resize', updateApiUpdateUI);
 
