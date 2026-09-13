@@ -80,6 +80,7 @@
   </div>
 
   <div class="topbar-right">
+    <span id="api-last-updated" style="display:none; font-size: 0.85em; margin-right: 8px; white-space: nowrap; font-weight: 500;"></span>
     <label id="polling-toggle" title="Actualización automática">
       <div class="toggle-pill on" id="poll-pill"></div>
       <span id="polling-label">Actualización automática</span>
@@ -760,6 +761,7 @@ async function buscarBusesPorLinea() {
 
   try {
     const xml = new DOMParser().parseFromString(await (await fetch('/bizkaibus')).text(), 'application/xml');
+    extractLastUpdateFromXml(xml);
     const found = [];
     const bounds = new L.LatLngBounds();
 
@@ -906,6 +908,7 @@ async function verTodosLosBuses() {
     const xml = new DOMParser().parseFromString(
       await (await fetch('/bizkaibus')).text(), 'application/xml'
     );
+    extractLastUpdateFromXml(xml);
 
     // Group by line for colour coding
     const lineColors = {};
@@ -1041,6 +1044,7 @@ async function buscarBusesPorParada() {
   const rtMap = new Map();
   try {
     const rtXml = new DOMParser().parseFromString(await (await fetch('/bizkaibus')).text(), 'application/xml');
+    extractLastUpdateFromXml(rtXml);
     for (const act of rtXml.getElementsByTagName('VehicleActivity')) {
       const jref  = act.querySelector('VehicleJourneyRef')?.textContent.trim();
       const spRef = act.querySelector('StopPointRef')?.textContent.trim();
@@ -1387,6 +1391,7 @@ async function buscarBusesPorModelo(modelo) {
     const xml = new DOMParser().parseFromString(
       await (await fetch('/bizkaibus')).text(), 'application/xml'
     );
+    extractLastUpdateFromXml(xml);
 
     const found = [];
     const bounds = new L.LatLngBounds();
@@ -1477,6 +1482,7 @@ async function localizarBusEnTiempoReal(targetTripId, targetVehicleRef) {
 
   try {
     const xml = new DOMParser().parseFromString(await (await fetch('/bizkaibus')).text(), 'application/xml');
+    extractLastUpdateFromXml(xml);
     for (const act of xml.getElementsByTagName('VehicleActivity')) {
       const jref  = act.querySelector('VehicleJourneyRef')?.textContent.trim();
       const vref  = act.querySelector('VehicleRef')?.textContent.trim();
@@ -1696,6 +1702,48 @@ function toggleFavs() {
 // ═══════════════════════════════════════════════════════
 let pollingActive = true, pollingSeconds = 60;
 let pollingTimer = null, countdownTimer = null;
+
+let lastApiUpdateDate = null;
+
+function extractLastUpdateFromXml(xml) {
+  const recordedEl = xml.querySelector('RecordedAtTime');
+  if (recordedEl && recordedEl.textContent) {
+    lastApiUpdateDate = new Date(recordedEl.textContent);
+    updateApiUpdateUI();
+  }
+}
+
+function updateApiUpdateUI() {
+  const span = document.getElementById('api-last-updated');
+  if (!span || !lastApiUpdateDate) return;
+  
+  const now = new Date();
+  const diffMs = now - lastApiUpdateDate;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  
+  const isMobile = window.innerWidth < 650;
+  let text = '';
+  
+  if (diffHours > 0) {
+    text = isMobile ? `🔄 ${diffHours}h` : `Última actualización: hace ${diffHours}h`;
+  } else if (diffMins > 0) {
+    text = isMobile ? `🔄 ${diffMins} min` : `Última actualización: hace ${diffMins} min`;
+  } else {
+    text = isMobile ? `🔄 ahora` : `Última actualización: ahora mismo`;
+  }
+  
+  span.textContent = text;
+  span.style.display = 'inline';
+  
+  if (diffMins >= 10) {
+    span.style.color = '#e53935'; // Red if > 10 mins
+  } else {
+    span.style.color = ''; // Default
+  }
+}
+
+window.addEventListener('resize', updateApiUpdateUI);
 
 function togglePolling() {
   pollingActive = document.getElementById('poll-check').checked;
