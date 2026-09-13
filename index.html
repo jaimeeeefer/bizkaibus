@@ -1738,8 +1738,17 @@ function updateApiUpdateUI() {
   
   if (diffMins >= 10) {
     span.style.color = '#e53935'; // Red if > 10 mins
+    span.style.cursor = 'pointer';
+    span.onclick = () => {
+      L.popup()
+        .setLatLng(map.getCenter())
+        .setContent("<strong>¡Atención!</strong><br>El servidor de Bizkaibus probablemente se haya caído.<br>Los tiempos y posiciones mostrados podrían no estar actualizados.")
+        .openOn(map);
+    };
   } else {
     span.style.color = ''; // Default
+    span.style.cursor = 'default';
+    span.onclick = null;
   }
 }
 
@@ -1798,7 +1807,10 @@ function toggleSidebar() {
 window.onload = async () => {
   // Verify session server-side (token stored in localStorage)
   await initAuth();
-  fetch('/bizkaibus').catch(()=>{});
+  fetch('/bizkaibus').then(r => r.text()).then(t => {
+    const xml = new DOMParser().parseFromString(t, 'application/xml');
+    extractLastUpdateFromXml(xml);
+  }).catch(()=>{});
   await Promise.all([cargarBusInfo(), cargarDatosGTFS()]);
   updateFavsUI();
   startPollingCountdown();
