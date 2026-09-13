@@ -1743,6 +1743,8 @@ function updateApiUpdateUI() {
     span.style.cursor = 'pointer';
     span.onclick = (e) => {
       e.stopPropagation();
+      if (e.target.closest('#api-alert-popup')) return; // Prevent bubbling from closing/reopening when clicking inside
+      
       let popup = document.getElementById('api-alert-popup');
       if (!popup) {
         popup = document.createElement('div');
