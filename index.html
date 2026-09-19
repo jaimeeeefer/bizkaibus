@@ -163,7 +163,7 @@
       <div id="stop-results" style="display:none">
         <div class="panel-heading" style="display: flex; gap: 8px; align-items: center;">
           <span id="stop-results-title" style="flex: 0 1 auto; min-width: 0; word-break: normal; overflow-wrap: break-word;">Próximos buses</span>
-          <div id="stop-line-filters" style="gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1 1 auto; padding-bottom: 2px;">
+          <div id="stop-line-filters" style="gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1 1 auto; padding-bottom: 2px;" onwheel="this.scrollLeft += Math.sign(event.deltaY)*30; event.preventDefault();">
             <!-- Filtros de linea -->
           </div>
           <div class="panel-heading-actions" style="flex: 0 0 auto; display: flex; gap: 6px;">
@@ -282,11 +282,13 @@ async function verificarSesion() {
 }
 
 async function initAuth() {
-  const valid = await verificarSesion();
-  if (valid) {
-    document.getElementById('login-overlay').remove();
-  }
-  // Si no es válido, el overlay ya está visible — el usuario tendrá que hacer login
+  // const valid = await verificarSesion();
+  // if (valid) {
+  //   document.getElementById('login-overlay').remove();
+  // }
+  
+  // Auth is temporarily disabled:
+  document.getElementById('login-overlay').remove();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -697,11 +699,37 @@ function copiarURL(params, texto) {
   const url = new URL(window.location.href);
   url.search = '';
   Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, v));
-  // Compose share text: "Texto URL"  — WhatsApp renders it nicely
-  const contenido = texto ? `${texto}\n${url.toString()}` : url.toString();
-  navigator.clipboard.writeText(contenido)
-    .then(() => mostrarToast('✓ Enlace copiado — listo para pegar'))
-    .catch(() => mostrarToast('No se pudo copiar el enlace'));
+  const link = url.toString();
+  
+  // En móvil usa el diálogo nativo, en PC copia al portapapeles
+  if (navigator.share && /Mobi|Android/i.test(navigator.userAgent)) {
+    navigator.share({ title: 'Bizkaibus', text: texto || '', url: link }).catch(console.warn);
+  } else {
+    const contenido = texto ? `${texto}\n${link}` : link;
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(contenido)
+        .then(() => mostrarToast('✓ Enlace copiado al portapapeles'))
+        .catch(() => fallbackCopy(contenido));
+    } else {
+      fallbackCopy(contenido);
+    }
+  }
+}
+
+function fallbackCopy(text) {
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.style.position = "fixed";
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  try {
+    document.execCommand('copy');
+    mostrarToast('✓ Enlace copiado al portapapeles');
+  } catch (err) {
+    mostrarToast('Error al copiar enlace');
+  }
+  document.body.removeChild(textArea);
 }
 
 function compartirParada() {
@@ -715,9 +743,13 @@ function compartirLinea() {
 }
 function compartirBus() {
   const num = document.getElementById('numBus').value.trim();
-  if (!num) return;
-  copiarURL({ bus: num }, `🚌 Sigue el bus ${num} en tiempo real:`);
+  if (num) {
+    copiarURL({ bus: num }, `🚌 Sigue el bus ${num} en tiempo real:`);
+  } else if (window.currentTripToShare) {
+    copiarURL({ trip: window.currentTripToShare }, `🚌 Sigue este viaje programado:`);
+  }
 }
+
 
 // ═══════════════════════════════════════════════════════
 // URL PARAMS → auto-search on load
@@ -738,6 +770,10 @@ function handleURLParams() {
     document.getElementById('numBus').value = p.get('bus');
     setTab('bus', document.querySelectorAll('.tab-btn')[2]);
     buscarBusPorNumero();
+  } else if (p.get('trip')) {
+    setTab('bus', document.querySelectorAll('.tab-btn')[2]);
+    window.currentTripToShare = p.get('trip');
+    mostrarRecorrido(p.get('trip'));
   }
 }
 
@@ -1243,7 +1279,7 @@ async function buscarBusesPorParada() {
       const schedShort = bus.hora.substring(0,5);
       const estShort   = bus.estDisplay.substring(0,5);
       return `
-        <div class="bus-card" onclick="setTab('bus',document.querySelectorAll('.tab-btn')[2]);${bus.vref?`document.getElementById('numBus').value='${bus.vref}';`:''}mostrarRecorrido('${bus.trip_id}','${bus.shape_id}')">
+        <div class="bus-card" onclick="setTab('bus',document.querySelectorAll('.tab-btn')[2]);document.getElementById('numBus').value='${bus.vref||''}';window.currentTripToShare='${bus.trip_id}';mostrarRecorrido('${bus.trip_id}','${bus.shape_id}')">
           <div class="bus-card-top">
             <span class="bus-badge">${bus.linea}</span>
             <span class="bus-card-dest">${bus.destino}</span>
