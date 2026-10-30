@@ -195,10 +195,16 @@
               <div class="headsign" id="route-headsign"></div>
               <div class="delay-info" id="delay-info"></div>
             </div>
-            <button class="btn-panel-action share-btn" id="btn-share-bus" onclick="compartirBus()"
-              style="display:inline-block;flex-shrink:0;margin-top:2px;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3);color:white">
-              🔗 Compartir
-            </button>
+            <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;margin-top:2px">
+              <button class="btn-panel-action share-btn" id="btn-share-bus" onclick="compartirBus()"
+                style="display:inline-block;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3);color:white">
+                🔗 Compartir
+              </button>
+              <button class="btn-panel-action" id="btn-fav-bus" onclick="addFavoriteBus()"
+                style="display:inline-block;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3);color:white">
+                ⭐ Guardar
+              </button>
+            </div>
           </div>
         </div>
         <div id="route-stop-list"></div>
@@ -696,18 +702,40 @@ function showPanel(name) {
   document.getElementById('line-results').style.display        = name === 'line'  ? 'block' : 'none';
   document.getElementById('route-details-panel').style.display = name === 'route' ? 'block' : 'none';
 
-  const btnFavStop  = document.getElementById('btn-fav-stop');
-  const btnFavLinea = document.getElementById('btn-fav-linea');
+  const btnFavStop    = document.getElementById('btn-fav-stop');
+  const btnFavLinea   = document.getElementById('btn-fav-linea');
+  const btnFavBus     = document.getElementById('btn-fav-bus');
   const btnShareStop  = document.getElementById('btn-share-stop');
   const btnShareLinea = document.getElementById('btn-share-linea');
+  const btnShareBus   = document.getElementById('btn-share-bus');
 
   btnFavStop.style.display    = name === 'stop' ? 'inline-block' : 'none';
   btnFavLinea.style.display   = name === 'line' ? 'inline-block' : 'none';
   btnShareStop.style.display  = name === 'stop' ? 'inline-block' : 'none';
   btnShareLinea.style.display = name === 'line' ? 'inline-block' : 'none';
+  if (btnShareBus) btnShareBus.style.display = name === 'route' ? 'inline-block' : 'none';
+  if (btnFavBus) {
+    if (name === 'route') {
+      updateBusFavBtnState();
+    } else {
+      btnFavBus.style.display = 'none';
+    }
+  }
 
-  if (name === 'stop') { btnFavStop.textContent  = '⭐'; btnFavStop.classList.remove('saved');  }
-  if (name === 'line') { btnFavLinea.textContent = '⭐'; btnFavLinea.classList.remove('saved'); }
+  if (name === 'stop') {
+    if (currentStopId && getFavs().some(f => f.type === 'stop' && f.id === currentStopId)) {
+      btnFavStop.textContent = '✓'; btnFavStop.classList.add('saved');
+    } else {
+      btnFavStop.textContent = '⭐'; btnFavStop.classList.remove('saved');
+    }
+  }
+  if (name === 'line') {
+    if (lastLineSearch && getFavs().some(f => f.type === 'line' && f.id === lastLineSearch)) {
+      btnFavLinea.textContent = '✓'; btnFavLinea.classList.add('saved');
+    } else {
+      btnFavLinea.textContent = '⭐ Guardar'; btnFavLinea.classList.remove('saved');
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -721,6 +749,11 @@ function clearInput(inputId, btnId) {
   const el = document.getElementById(inputId);
   if (el) { el.value = ''; el.focus(); }
   toggleClear(btnId, '');
+  if (inputId === 'numBus') {
+    currentBusSearch = null;
+    const btn = document.getElementById('btn-fav-bus');
+    if (btn) btn.style.display = 'none';
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -820,6 +853,7 @@ function handleURLParams() {
 // ═══════════════════════════════════════════════════════
 let lastLineSearch = null;
 let lastModelSearch = null;
+let currentBusSearch = null;
 
 async function buscarBusesPorLinea() {
   const inputRaw = document.getElementById('linea').value.trim();
@@ -830,6 +864,10 @@ async function buscarBusesPorLinea() {
 
   clearMapElements(); clearLineMarkers();
   showPanel('line');
+  if (getFavs().some(f => f.type === 'line' && f.id === lastLineSearch)) {
+    const btn = document.getElementById('btn-fav-linea');
+    if (btn) { btn.textContent = '✓'; btn.classList.add('saved'); }
+  }
   document.getElementById('line-results-title').textContent = `Buses línea ${inputRaw.toUpperCase()}`;
   document.getElementById('line-bus-list').innerHTML = '<div class="empty-state"><div class="spinner" style="margin:0 auto"></div></div>';
 
@@ -1416,10 +1454,12 @@ async function buscarBusPorNumero() {
 
   // Check if input matches a model (non-numeric)
   if (!/^\d+$/.test(input)) {
+    currentBusSearch = null;
     await buscarBusesPorModelo(input);
     return;
   }
 
+  currentBusSearch = input;
   clearMapElements(); clearLineMarkers();
   showPanel('route');
   document.getElementById('route-details-panel').style.display = 'block';
@@ -1427,13 +1467,35 @@ async function buscarBusPorNumero() {
   document.getElementById('route-headsign').textContent  = '';
   document.getElementById('delay-info').textContent      = '';
   document.getElementById('route-stop-list').innerHTML = '<div class="empty-state"><div class="spinner" style="margin:0 auto"></div></div>';
+  updateBusFavBtnState(input);
 
   const foundTripId = await localizarBusEnTiempoReal(null, input);
   if (foundTripId) {
     const trip = tripsData.get(foundTripId);
     if (trip) mostrarRecorrido(foundTripId, trip.shape_id);
+    updateBusFavBtnState(input);
   } else {
-    document.getElementById('route-stop-list').innerHTML = `<div class="empty-state">Bus nº ${input} no encontrado en tiempo real.</div>`;
+    updateBusFavBtnState(input);
+    const infoBus = busInfoMap.get(input);
+    let cardHTML = '';
+    if (infoBus) {
+      const abrev = concesionAbrev(infoBus.concesion);
+      cardHTML = `
+        <div class="bus-list-item" style="cursor:default; margin-bottom:12px;">
+          <span class="badge" style="background:var(--ink-soft)">#${input}</span>
+          <div class="bus-list-item-info">
+            <div class="main">Bus #${input}${abrev ? ` <span style="font-size:0.75rem;color:var(--ink-soft);font-weight:400">(${abrev})</span>` : ''}</div>
+            <div class="sub">Matrícula: ${infoBus.matricula || '—'}</div>
+            ${infoBus.modelo && infoBus.modelo !== '—' ? `<div class="sub">Modelo: ${infoBus.modelo}</div>` : ''}
+            ${infoBus.concesion && infoBus.concesion !== '—' && !abrev ? `<div class="sub">Concesión: ${infoBus.concesion}</div>` : ''}
+          </div>
+        </div>
+      `;
+    }
+    document.getElementById('route-stop-list').innerHTML = `
+      ${cardHTML}
+      <div class="empty-state" style="padding:16px 10px;">Bus nº ${input} no encontrado en tiempo real.</div>
+    `;
   }
 }
 
@@ -1571,6 +1633,13 @@ async function localizarBusEnTiempoReal(targetTripId, targetVehicleRef) {
       const infoBus      = busInfoMap.get(vref)||{matricula:'—',modelo:'—',fecha:'—'};
       const paradaNom    = spRef ? getCleanStopName(spRef) : 'N/D';
       currentBusStopIdRealTime = spRef;
+      if (vref) {
+        currentBusSearch = vref;
+        if (!document.getElementById('numBus').value.trim()) {
+          document.getElementById('numBus').value = vref;
+        }
+        updateBusFavBtnState(vref);
+      }
       const lineaDisplay = jref && tripsData.has(jref) ? tripsData.get(jref).route_id : 'N/A';
       const destDisplay  = jref && tripsData.has(jref) ? tripsData.get(jref).trip_headsign : 'N/A';
 
@@ -1648,6 +1717,12 @@ async function mostrarRecorrido(tripId, shapeId) {
   stopMarkers.forEach(m => map.removeLayer(m)); stopMarkers = [];
   linePolylines.forEach(p => map.removeLayer(p)); linePolylines = [];
   showPanel('route');
+
+  const busNum = currentBusSearch || (document.getElementById('numBus') ? document.getElementById('numBus').value.trim() : null);
+  if (busNum && /^\d+$/.test(busNum)) {
+    currentBusSearch = busNum;
+    updateBusFavBtnState(busNum);
+  }
 
   const trip = tripsData.get(tripId);
   if (!trip) return;
@@ -1747,8 +1822,68 @@ function addFavoriteLine() {
   btn.textContent = '✓'; btn.classList.add('saved');
 }
 
+function addFavoriteBus(busNum) {
+  const num = busNum || currentBusSearch || (document.getElementById('numBus') ? document.getElementById('numBus').value.trim() : null);
+  if (!num || !/^\d+$/.test(num)) return;
+  const btn = document.getElementById('btn-fav-bus');
+  const favs = getFavs();
+  const idx = favs.findIndex(f => f.type === 'bus' && f.id === num);
+  if (idx !== -1) {
+    favs.splice(idx, 1);
+    saveFavs(favs);
+    updateFavsUI();
+    updateBusFavBtnState(num);
+    return;
+  }
+  const info = busInfoMap.get(num);
+  const abrev = info ? concesionAbrev(info.concesion) : '';
+  const label = `🚌 Bus #${num}${abrev ? ` (${abrev})` : ''}`;
+  favs.push({ type: 'bus', id: num, label: label });
+  saveFavs(favs);
+  updateFavsUI();
+  updateBusFavBtnState(num);
+}
+
+function updateBusFavBtnState(busNum) {
+  const num = busNum || currentBusSearch || (document.getElementById('numBus') ? document.getElementById('numBus').value.trim() : null);
+  const btn = document.getElementById('btn-fav-bus');
+  if (!btn) return;
+  if (!num || !/^\d+$/.test(num)) {
+    btn.style.display = 'none';
+    return;
+  }
+  btn.style.display = 'inline-block';
+  const favs = getFavs();
+  const isFav = favs.some(f => f.type === 'bus' && f.id === num);
+  if (isFav) {
+    btn.textContent = '✓';
+    btn.classList.add('saved');
+    btn.title = 'Quitar de favoritos';
+  } else {
+    btn.textContent = '⭐ Guardar';
+    btn.classList.remove('saved');
+    btn.title = 'Guardar bus';
+  }
+}
+
 function removeFav(idx) {
-  const favs = getFavs(); favs.splice(idx,1); saveFavs(favs); updateFavsUI();
+  const favs = getFavs();
+  const removed = favs[idx];
+  favs.splice(idx, 1);
+  saveFavs(favs);
+  updateFavsUI();
+  if (removed) {
+    if (removed.type === 'stop' && removed.id === currentStopId) {
+      const btn = document.getElementById('btn-fav-stop');
+      if (btn) { btn.textContent = '⭐'; btn.classList.remove('saved'); }
+    } else if (removed.type === 'line' && removed.id === lastLineSearch) {
+      const btn = document.getElementById('btn-fav-linea');
+      if (btn) { btn.textContent = '⭐ Guardar'; btn.classList.remove('saved'); }
+    } else if (removed.type === 'bus') {
+      const curNum = currentBusSearch || (document.getElementById('numBus') ? document.getElementById('numBus').value.trim() : null);
+      if (removed.id === curNum) updateBusFavBtnState(curNum);
+    }
+  }
 }
 
 function updateFavsUI() {
@@ -1761,7 +1896,11 @@ function updateFavsUI() {
     const div = document.createElement('div');
     div.className = 'fav-item';
     div.innerHTML = `<span class="fav-label">${fav.label}</span><button class="fav-del" onclick="event.stopPropagation();removeFav(${i})" title="Eliminar">×</button>`;
-    div.onclick = () => { if (fav.type==='stop') rellenarYBuscarParada(fav.id, getCleanStopName(fav.id)); else rellenarYBuscarLinea(fav.id); };
+    div.onclick = () => {
+      if (fav.type === 'stop') rellenarYBuscarParada(fav.id, getCleanStopName(fav.id));
+      else if (fav.type === 'line') rellenarYBuscarLinea(fav.id);
+      else if (fav.type === 'bus') rellenarYBuscarBus(fav.id);
+    };
     listEl.appendChild(div);
   });
 }

@@ -438,6 +438,9 @@ body {
 .btn-panel-action.saved:hover { border-color: var(--green); color: var(--green); background: #E6F7EE; }
 .btn-panel-action.share-btn   { border-style: solid; }
 .btn-panel-action.share-btn:hover { border-color: var(--accent); color: var(--accent); }
+#btn-fav-bus                  { border-style: solid; }
+#btn-fav-bus.saved            { background: #E6F7EE !important; border-color: var(--green) !important; color: var(--green) !important; cursor: pointer !important; }
+[data-theme="dark"] #btn-fav-bus.saved { background: rgba(29, 171, 95, 0.2) !important; border-color: var(--green) !important; color: #26E07A !important; }
 
 /* ─── MAP ────────────────────────────────────────────── */
 #map-container { flex: 1; position: relative; overflow: hidden; }
