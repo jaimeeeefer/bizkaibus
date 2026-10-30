@@ -196,13 +196,13 @@
               <div class="delay-info" id="delay-info"></div>
             </div>
             <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;margin-top:2px">
-              <button class="btn-panel-action share-btn" id="btn-share-bus" onclick="compartirBus()"
+              <button class="btn-panel-action share-btn" id="btn-share-bus" onclick="compartirBus()" title="Compartir bus"
                 style="display:inline-block;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3);color:white">
-                🔗 Compartir
+                🔗
               </button>
-              <button class="btn-panel-action" id="btn-fav-bus" onclick="addFavoriteBus()"
+              <button class="btn-panel-action" id="btn-fav-bus" onclick="addFavoriteBus()" title="Guardar bus"
                 style="display:inline-block;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3);color:white">
-                ⭐ Guardar
+                ⭐
               </button>
             </div>
           </div>
@@ -1860,7 +1860,7 @@ function updateBusFavBtnState(busNum) {
     btn.classList.add('saved');
     btn.title = 'Quitar de favoritos';
   } else {
-    btn.textContent = '⭐ Guardar';
+    btn.textContent = '⭐';
     btn.classList.remove('saved');
     btn.title = 'Guardar bus';
   }
