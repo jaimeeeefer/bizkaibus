@@ -4,7 +4,14 @@
   <meta charset="UTF-8" />
   <title>Bizkaibus · Tiempo Real</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#00873D" id="meta-theme-color" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Bizkaibus" />
+  <link rel="manifest" href="/manifest.json" />
   <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Nunito:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,300;1,400&display=swap" rel="stylesheet">
@@ -31,6 +38,8 @@
     // Apply dark mode before paint to avoid flash
     if (localStorage.getItem('theme') === 'dark') {
       document.documentElement.setAttribute('data-theme', 'dark');
+      const meta = document.getElementById('meta-theme-color');
+      if (meta) meta.setAttribute('content', '#181B24');
     }
   </script>
 </head>
@@ -306,6 +315,8 @@ function toggleTheme() {
   document.documentElement.setAttribute('data-theme', next);
   localStorage.setItem('theme', next);
   document.getElementById('theme-toggle').textContent = next === 'dark' ? '☀️' : '🌙';
+  const meta = document.getElementById('meta-theme-color');
+  if (meta) meta.setAttribute('content', next === 'dark' ? '#181B24' : '#00873D');
   // Swap map tile layer
   applyMapTheme(next === 'dark');
 }
@@ -2058,6 +2069,11 @@ window.onload = async () => {
   document.getElementById('numBus').addEventListener('keydown',      e => { if(e.key==='Enter') buscarBusPorNumero(); });
   // Handle shared URL params after data is loaded
   handleURLParams();
+
+  // Register PWA service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(err => console.warn('PWA SW error:', err));
+  }
 };
 </script>
 </body>
