@@ -330,6 +330,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ═══════════════════════════════════════════════════════
 // DATA URLS
 // ═══════════════════════════════════════════════════════
+const FLOTA_URL         = "https://info-bizkaibus.jaimeferni10.workers.dev/flota"; // Worker que lee busphoto.eu (TSV)
 const SHEET_TSV_URL      = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYeZkna4mwxp3p2azwTgAPcjeSBoUU_rhWW5gVZ7hqotNtojQOHtsjbEnnlJbrijBVwck_kWERE__6/pub?output=tsv";
 let STOPS_URL          = "https://dl.rix.dev/bizkaibus/stops.txt";
 let STOP_TIMES1_URL    = "https://dl.rix.dev/bizkaibus/stop_times1.txt";
@@ -613,18 +614,26 @@ function concesionAbrev(raw) {
 }
 
 async function cargarBusInfo() {
-  try {
-    const rows = (await (await fetch(SHEET_TSV_URL)).text()).trim().split('\n').map(r => r.split('\t'));
-    rows.slice(1).forEach(r => {
-      const num = r[0]?.trim();
-      if (num) busInfoMap.set(num, {
-        matricula:  r[1]?.trim() || '—',
-        modelo:     r[2]?.trim() || '—',
-        fecha:      r[3]?.trim() || '—',
-        concesion:  r[4]?.trim() || '—',
+  // La flota sale del TSV del Worker (busphoto.eu, actualizado a diario).
+  // Si el Worker falla o devuelve pocos datos, se usa la hoja de Google como respaldo.
+  for (const url of [FLOTA_URL, SHEET_TSV_URL]) {
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) continue;
+      const rows = (await resp.text()).trim().split('\n').map(r => r.split('\t'));
+      let n = 0;
+      rows.slice(1).forEach(r => {
+        const num = r[0]?.trim();
+        if (num) { n++; busInfoMap.set(num, {
+          matricula:  r[1]?.trim() || '—',
+          modelo:     r[2]?.trim() || '—',
+          fecha:      r[3]?.trim() || '—',
+          concesion:  r[4]?.trim() || '—',
+        }); }
       });
-    });
-  } catch(e) { console.warn('busInfo error', e); }
+      if (n > 50) return; // datos suficientes: no hace falta el respaldo
+    } catch(e) { console.warn('busInfo error', url, e); }
+  }
 }
 
 // ═══════════════════════════════════════════════════════
