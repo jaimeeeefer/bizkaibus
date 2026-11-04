@@ -205,6 +205,10 @@
               <div class="delay-info" id="delay-info"></div>
             </div>
             <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;margin-top:2px">
+              <button class="btn-panel-action share-btn" id="btn-info-bus" onclick="toggleBusInfo()" title="Información del bus"
+                style="display:none;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3);color:white">
+                ℹ️
+              </button>
               <button class="btn-panel-action share-btn" id="btn-share-bus" onclick="compartirBus()" title="Compartir bus"
                 style="display:inline-block;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3);color:white">
                 🔗
@@ -216,6 +220,7 @@
             </div>
           </div>
         </div>
+        <div id="bus-info-card" style="display:none"></div>
         <div id="route-stop-list"></div>
       </div>
 
@@ -629,6 +634,7 @@ async function cargarBusInfo() {
           modelo:     r[2]?.trim() || '—',
           fecha:      r[3]?.trim() || '—',
           concesion:  r[4]?.trim() || '—',
+          chasis:     r[5]?.trim() || '—',
         }); }
       });
       if (n > 50) return; // datos suficientes: no hace falta el respaldo
@@ -734,6 +740,9 @@ function showPanel(name) {
   btnShareStop.style.display  = name === 'stop' ? 'inline-block' : 'none';
   btnShareLinea.style.display = name === 'line' ? 'inline-block' : 'none';
   if (btnShareBus) btnShareBus.style.display = name === 'route' ? 'inline-block' : 'none';
+  const btnInfoBus = document.getElementById('btn-info-bus');
+  if (btnInfoBus) btnInfoBus.style.display = name === 'route' ? 'inline-block' : 'none';
+  hideBusInfoCard();
   if (btnFavBus) {
     if (name === 'route') {
       updateBusFavBtnState();
@@ -1497,26 +1506,55 @@ async function buscarBusPorNumero() {
   } else {
     updateBusFavBtnState(input);
     const infoBus = busInfoMap.get(input);
-    let cardHTML = '';
-    if (infoBus) {
-      const abrev = concesionAbrev(infoBus.concesion);
-      cardHTML = `
-        <div class="bus-list-item" style="cursor:default; margin-bottom:12px;">
-          <span class="badge" style="background:var(--ink-soft)">#${input}</span>
-          <div class="bus-list-item-info">
-            <div class="main">Bus #${input}${abrev ? ` <span style="font-size:0.75rem;color:var(--ink-soft);font-weight:400">(${abrev})</span>` : ''}</div>
-            <div class="sub">Matrícula: ${infoBus.matricula || '—'}</div>
-            ${infoBus.modelo && infoBus.modelo !== '—' ? `<div class="sub">Modelo: ${infoBus.modelo}</div>` : ''}
-            ${infoBus.concesion && infoBus.concesion !== '—' && !abrev ? `<div class="sub">Concesión: ${infoBus.concesion}</div>` : ''}
-          </div>
-        </div>
-      `;
-    }
+    const btnInfo = document.getElementById('btn-info-bus');
+    if (btnInfo) btnInfo.style.display = 'none'; // la tarjeta ya se muestra abajo
+    const cardHTML = infoBus ? busInfoCardHTML(input, infoBus, true) : '';
     document.getElementById('route-stop-list').innerHTML = `
       ${cardHTML}
       <div class="empty-state" style="padding:16px 10px;">Bus nº ${input} no encontrado en tiempo real.</div>
     `;
   }
+}
+
+// ═══════════════════════════════════════════════════════
+// BUS INFO CARD (ficha del bus: matrícula, matriculación, chasis, modelo…)
+// ═══════════════════════════════════════════════════════
+function busInfoCardHTML(num, info, withMargin) {
+  const has = v => v && v !== '—';
+  const abrev = concesionAbrev(info.concesion);
+  return `
+    <div class="bus-list-item" style="cursor:default; margin-bottom:${withMargin ? '12px' : '10px'};">
+      <span class="badge" style="background:var(--ink-soft)">#${num}</span>
+      <div class="bus-list-item-info">
+        <div class="main">Bus #${num}${abrev ? ` <span style="font-size:0.75rem;color:var(--ink-soft);font-weight:400">(${abrev})</span>` : ''}</div>
+        <div class="sub">Matrícula: ${info.matricula || '—'}</div>
+        ${has(info.fecha) ? `<div class="sub">Matriculación: ${info.fecha}</div>` : ''}
+        ${has(info.chasis) ? `<div class="sub">Chasis: ${info.chasis}</div>` : ''}
+        ${has(info.modelo) ? `<div class="sub">Modelo: ${info.modelo}</div>` : ''}
+        ${has(info.concesion) && !abrev ? `<div class="sub">Concesión: ${info.concesion}</div>` : ''}
+      </div>
+    </div>`;
+}
+
+function hideBusInfoCard() {
+  const card = document.getElementById('bus-info-card');
+  if (card) { card.style.display = 'none'; card.innerHTML = ''; }
+  const btn = document.getElementById('btn-info-bus');
+  if (btn) btn.classList.remove('info-active');
+}
+
+function toggleBusInfo() {
+  const card = document.getElementById('bus-info-card');
+  const btn  = document.getElementById('btn-info-bus');
+  if (!card) return;
+  if (card.style.display !== 'none') { hideBusInfoCard(); return; }
+  const num  = (document.getElementById('numBus').value || currentBusSearch || '').trim();
+  const info = busInfoMap.get(num);
+  card.innerHTML = info
+    ? busInfoCardHTML(num, info, false)
+    : `<div class="empty-state" style="padding:12px 10px;">No hay datos de la flota para el bus ${num || ''}.</div>`;
+  card.style.display = 'block';
+  if (btn) btn.classList.add('info-active');
 }
 
 async function buscarBusesPorModelo(modelo) {

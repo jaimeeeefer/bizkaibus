@@ -496,3 +496,5 @@ body {
   .topbar-title   { font-size: 0.9rem; }
   .topbar-logo-dot { width: 26px; height: 26px; }
 }
+/* ─── BOTÓN INFO BUS (activo) ────────────────────────── */
+.btn-panel-action.info-active { background: rgba(255,255,255,.3) !important; border-color: rgba(255,255,255,.7) !important; }
