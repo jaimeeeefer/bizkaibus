@@ -1529,9 +1529,8 @@ function busInfoCardHTML(num, info, withMargin) {
         <div class="main">Bus #${num}${abrev ? ` <span style="font-size:0.75rem;color:var(--ink-soft);font-weight:400">(${abrev})</span>` : ''}</div>
         <div class="sub">Matrícula: ${info.matricula || '—'}</div>
         ${has(info.fecha) ? `<div class="sub">Matriculación: ${info.fecha}</div>` : ''}
-        ${has(info.chasis) ? `<div class="sub">Chasis: ${info.chasis}</div>` : ''}
         ${has(info.modelo) ? `<div class="sub">Modelo: ${info.modelo}</div>` : ''}
-        ${has(info.concesion) && !abrev ? `<div class="sub">Concesión: ${info.concesion}</div>` : ''}
+        ${has(info.chasis) ? `<div class="sub">Chasis: ${info.chasis}</div>` : ''}
       </div>
     </div>`;
 }
