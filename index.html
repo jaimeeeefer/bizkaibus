@@ -346,6 +346,12 @@ let TRIPS_URL          = "https://dl.rix.dev/bizkaibus/trips.txt";
 let ROUTES_URL         = "https://dl.rix.dev/bizkaibus/routes.txt";
 let CALENDAR_URL       = "https://dl.rix.dev/bizkaibus/calendar.txt";
 let CALENDAR_DATES_URL = "https://dl.rix.dev/bizkaibus/calendar_dates.txt";
+const SHAPES_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/datos/shapes.json";
+let shapesData = {};
+function cargarShape(shapeId) {
+  const pts = shapeId ? shapesData[shapeId] : null;
+  return (Array.isArray(pts) && pts.length > 1) ? pts : null;
+}
 
 // ═══════════════════════════════════════════════════════
 // MAP
@@ -569,6 +575,13 @@ async function cargarDatosGTFS() {
       trip_headsign: r[3]?.trim(), shape_id: r[7]?.trim()
     });
   });
+
+  setLoading('Cargando trazados…');
+  try {
+    const shRes = await fetch(SHAPES_URL);
+    if (shRes.ok) shapesData = await shRes.json();
+    else console.warn('[shapes] HTTP', shRes.status);
+  } catch (e) { console.warn('[shapes] no se pudieron cargar los trazados, se usarán rectas entre paradas', e); }
 
   // Build line search index from routes.txt (route_desc = "A3323-PORTUGALETE-GALDAMES")
   const routesText = await (await fetch(ROUTES_URL)).text();
@@ -946,8 +959,10 @@ async function buscarBusesPorLinea() {
             bounds.extend([s.stop_lat, s.stop_lon]);
           }
         }
-        if (latlngs.length > 1) {
-          const polyline = L.polyline(latlngs, {color: '#1565C0', weight: 4, opacity: 0.5}).addTo(map);
+        const shapePts = cargarShape(tripsData.get(tripId)?.shape_id);
+        const linePts = shapePts || latlngs;
+        if (linePts.length > 1) {
+          const polyline = L.polyline(linePts, {color: '#1565C0', weight: 4, opacity: 0.5}).addTo(map);
           linePolylines.push(polyline);
         }
       }
@@ -1800,7 +1815,8 @@ async function mostrarRecorrido(tripId, shapeId) {
     bounds.extend([info.stop_lat, info.stop_lon]);
   });
   if (points.length) {
-    const poly = L.polyline(points, { color: COLORS[0], weight: 4, opacity: 0.75 }).addTo(map);
+    const shapePts = cargarShape(trip.shape_id || shapeId);
+    const poly = L.polyline(shapePts || points, { color: COLORS[0], weight: 4, opacity: 0.75 }).addTo(map);
     linePolylines.push(poly);
     if (bounds.isValid()) map.fitBounds(bounds, {padding:[50,50]});
   }
