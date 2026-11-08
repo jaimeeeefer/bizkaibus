@@ -346,11 +346,21 @@ let TRIPS_URL          = "https://dl.rix.dev/bizkaibus/trips.txt";
 let ROUTES_URL         = "https://dl.rix.dev/bizkaibus/routes.txt";
 let CALENDAR_URL       = "https://dl.rix.dev/bizkaibus/calendar.txt";
 let CALENDAR_DATES_URL = "https://dl.rix.dev/bizkaibus/calendar_dates.txt";
+// Trazados reales de las líneas (shapes.json = {shape_id: [[lat,lon],...]}, simplificado a 4 m).
+// Subir shapes.json a datos/ del repo. Se carga entero al abrir la página, como el resto de datos.
 const SHAPES_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/datos/shapes.json";
 let shapesData = {};
 function cargarShape(shapeId) {
   const pts = shapeId ? shapesData[shapeId] : null;
   return (Array.isArray(pts) && pts.length > 1) ? pts : null;
+}
+
+// Línea estilo Google Maps: borde blanco por debajo + trazo grueso casi opaco con extremos redondeados.
+function dibujarLinea(pts, color) {
+  const casing = L.polyline(pts, { color: '#ffffff', weight: 9, opacity: 0.9, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+  const linea  = L.polyline(pts, { color, weight: 6, opacity: 0.95, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+  linePolylines.push(casing, linea);
+  return linea;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -962,8 +972,7 @@ async function buscarBusesPorLinea() {
         const shapePts = cargarShape(tripsData.get(tripId)?.shape_id);
         const linePts = shapePts || latlngs;
         if (linePts.length > 1) {
-          const polyline = L.polyline(linePts, {color: '#1565C0', weight: 4, opacity: 0.5}).addTo(map);
-          linePolylines.push(polyline);
+          dibujarLinea(linePts, '#1565C0');
         }
       }
     }
@@ -1816,8 +1825,7 @@ async function mostrarRecorrido(tripId, shapeId) {
   });
   if (points.length) {
     const shapePts = cargarShape(trip.shape_id || shapeId);
-    const poly = L.polyline(shapePts || points, { color: COLORS[0], weight: 4, opacity: 0.75 }).addTo(map);
-    linePolylines.push(poly);
+    dibujarLinea(shapePts || points, COLORS[0]);
     if (bounds.isValid()) map.fitBounds(bounds, {padding:[50,50]});
   }
 
