@@ -358,7 +358,7 @@ function cargarShape(shapeId) {
 // Línea estilo Google Maps: borde blanco por debajo + trazo grueso casi opaco con extremos redondeados.
 function dibujarLinea(pts, color) {
   const casing = L.polyline(pts, { color: '#ffffff', weight: 7, opacity: 0.9, lineCap: 'round', lineJoin: 'round' }).addTo(map);
-  const linea  = L.polyline(pts, { color, weight: 4.5, opacity: 0.9, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+  const linea  = L.polyline(pts, { color, weight: 4.5, opacity: 0.95, lineCap: 'round', lineJoin: 'round' }).addTo(map);
   linePolylines.push(casing, linea);
   return linea;
 }
@@ -509,6 +509,18 @@ function clearLineMarkers() { markers.forEach(m => map.removeLayer(m)); markers 
 // ═══════════════════════════════════════════════════════
 // LOAD GTFS
 // ═══════════════════════════════════════════════════════
+function usarURLsGitHub() {
+  STOPS_URL    = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/datos/stops.txt";
+  STOP_TIMES1_URL    = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/datos/stop_times1.txt";
+  STOP_TIMES2_URL    = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/datos/stop_times2.txt";
+  STOP_TIMES3_URL    = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/datos/stop_times3.txt";
+  STOP_TIMES4_URL    = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/datos/stop_times4.txt";
+  TRIPS_URL    = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/datos/trips.txt";
+  ROUTES_URL   = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/datos/routes.txt";
+  CALENDAR_URL       = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/datos/calendar.txt";
+  CALENDAR_DATES_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/datos/calendar_dates.txt";
+}
+
 async function cargarDatosGTFS() {
   setLoading('Comprobando versión de datos…');
   try {
@@ -518,19 +530,12 @@ async function cargarDatosGTFS() {
       const daysOld = (new Date() - new Date(lastModified)) / (1000 * 60 * 60 * 24);
       if (daysOld > 30) {
         console.warn(`[GTFS] Datos en rix.dev son de hace ${Math.round(daysOld)} días. Cambiando a GitHub...`);
-        STOPS_URL          = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/datos/stops.txt";
-        STOP_TIMES1_URL    = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/datos/stop_times1.txt";
-        STOP_TIMES2_URL    = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/datos/stop_times2.txt";
-        STOP_TIMES3_URL    = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/datos/stop_times3.txt";
-        STOP_TIMES4_URL    = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/datos/stop_times4.txt";
-        TRIPS_URL          = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/datos/trips.txt";
-        ROUTES_URL         = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/datos/routes.txt";
-        CALENDAR_URL       = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/datos/calendar.txt";
-        CALENDAR_DATES_URL = "https://raw.githubusercontent.com/jaimeeeefer/bizkaibus/refs/heads/main/datos/calendar_dates.txt";
+        usarURLsGitHub();
       }
     }
   } catch (err) {
-    console.warn('[GTFS] No se pudo verificar la fecha, usando URLs por defecto.', err);
+    console.warn('[GTFS] rix.dev no responde (CORS/red). Cambiando a GitHub...', err);
+    usarURLsGitHub();
   }
 
   setLoading('Cargando paradas…');
