@@ -357,8 +357,8 @@ function cargarShape(shapeId) {
 
 // Línea estilo Google Maps: borde blanco por debajo + trazo grueso casi opaco con extremos redondeados.
 function dibujarLinea(pts, color) {
-  const casing = L.polyline(pts, { color: '#ffffff', weight: 9, opacity: 0.9, lineCap: 'round', lineJoin: 'round' }).addTo(map);
-  const linea  = L.polyline(pts, { color, weight: 6, opacity: 0.95, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+  const casing = L.polyline(pts, { color: '#ffffff', weight: 7, opacity: 0.9, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+  const linea  = L.polyline(pts, { color, weight: 4.5, opacity: 0.95, lineCap: 'round', lineJoin: 'round' }).addTo(map);
   linePolylines.push(casing, linea);
   return linea;
 }
