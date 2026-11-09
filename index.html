@@ -335,6 +335,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ═══════════════════════════════════════════════════════
 // DATA URLS
 // ═══════════════════════════════════════════════════════
+const TRAMOS_URL        = "https://info-bizkaibus.jaimeferni10.workers.dev/tramos"; // tiempos reales entre paradas (aprendidos)
 const FLOTA_URL         = "https://info-bizkaibus.jaimeferni10.workers.dev/flota"; // Worker que lee busphoto.eu (TSV)
 const SHEET_TSV_URL      = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYeZkna4mwxp3p2azwTgAPcjeSBoUU_rhWW5gVZ7hqotNtojQOHtsjbEnnlJbrijBVwck_kWERE__6/pub?output=tsv";
 let STOPS_URL          = "https://dl.rix.dev/bizkaibus/stops.txt";
@@ -436,6 +437,69 @@ function computeBusDelay(prevStop, nextStop, prevInfo, nextInfo, busLat, busLon,
     }
   }
   return actual - schedArr;
+}
+
+
+// ═══════════════════════════════════════════════════════
+// TIEMPOS APRENDIDOS ENTRE PARADAS
+// El Worker mide cuánto tardan realmente los buses entre cada par de paradas (por tipo de día y hora).
+// Aquí se compara con el horario del GTFS: la diferencia es lo que el retraso suele crecer/bajar en ese
+// tramo. Con pocas muestras el efecto se atenúa; sin datos, no cambia nada (queda el retraso actual).
+// ═══════════════════════════════════════════════════════
+const TRAMOS_MIN_N = 5, TRAMOS_TTL = 5 * 60 * 1000;
+const tramosCache = new Map();      // "A-B" → { t, d: { hora: [n, mediaSeg] } }
+const tripStopsCache = new Map();   // trip_id → paradas ordenadas
+
+function dtHoy() { const d = new Date().getDay(); return d === 0 ? 2 : d === 6 ? 1 : 0; } // 0 L-V · 1 sáb · 2 dom
+
+function getTripStops(tripId) {
+  let a = tripStopsCache.get(tripId);
+  if (!a) {
+    a = stopTimesData.filter(s => s.trip_id === tripId).sort((x, y) => x.stop_sequence - y.stop_sequence);
+    tripStopsCache.set(tripId, a);
+  }
+  return a;
+}
+const segKey = (a, b) => a.stop_id + '-' + b.stop_id;
+function pairsEntre(ts, i, j) { const p = []; for (let k = i; k < j; k++) p.push(segKey(ts[k], ts[k + 1])); return p; }
+
+async function pedirTramos(pairs) {
+  const now = Date.now();
+  const falta = [...new Set(pairs)].filter(p => !(tramosCache.get(p)?.t > now - TRAMOS_TTL));
+  for (let i = 0; i < falta.length; i += 120) {
+    const lote = falta.slice(i, i + 120);
+    try {
+      const r = await fetch(`${TRAMOS_URL}?dt=${dtHoy()}&pairs=${encodeURIComponent(lote.join(','))}`);
+      const d = r.ok ? await r.json() : {};
+      lote.forEach(p => tramosCache.set(p, { t: now, d: d[p] || {} }));
+    } catch (e) { console.warn('tramos', e); }
+  }
+}
+
+// Segundos que, de media, el bus gana o pierde respecto al horario en el tramo a→b (0 si no hay datos fiables)
+function driftTramo(a, b) {
+  const dep = s => timeToSeconds(s.departure_time || s.arrival_time);
+  const sa = dep(a), sb = dep(b);
+  if (sa <= 0 || sb <= 0 || sb <= sa) return 0;
+  const datos = tramosCache.get(segKey(a, b))?.d;
+  if (!datos) return 0;
+  const h = Math.floor(sa / 3600) % 24;
+  let n = 0, suma = 0;
+  for (const hh of [h, (h + 23) % 24, (h + 1) % 24]) { // la hora propia pesa doble; las vecinas rellenan huecos
+    const e = datos[hh]; if (!e) continue;
+    const w = hh === h ? 2 : 1; n += e[0] * w; suma += e[0] * e[1] * w;
+  }
+  if (n < TRAMOS_MIN_N) return 0;
+  const sched = sb - sa, cota = Math.max(sched, 60);
+  const raw = Math.max(-0.5 * cota, Math.min(1.5 * cota, suma / n - sched));
+  return raw * (n / (n + 10)); // pocas muestras → efecto más pequeño
+}
+
+// Retraso extra acumulado desde la parada i hasta la j del viaje (ts = paradas ordenadas)
+function driftEntre(ts, i, j) {
+  let t = 0;
+  for (let k = i; k < j; k++) t += driftTramo(ts[k], ts[k + 1]);
+  return t;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1232,6 +1296,17 @@ async function buscarBusesPorParada() {
 
 
 
+  // Tiempos aprendidos de los tramos que aún le faltan a cada bus hasta esta parada
+  try {
+    const pares = [];
+    for (const [jref, live] of rtMap) {
+      const ts = getTripStops(jref);
+      const ia = ts.findIndex(s => s.stop_id === live.stopPointRef), ib = ts.findIndex(s => s.stop_id === stopId);
+      if (ia >= 0 && ib > ia) pares.push(...pairsEntre(ts, ia, ib));
+    }
+    if (pares.length) await pedirTramos(pares);
+  } catch (e) { console.warn('tramos parada', e); }
+
   // ── Helper: get scheduled trips for a stop on a given date/dow ──
   function getScheduledTrips(dateStr, dayOfWeek, fromSec, applyRT) {
     const results = [];
@@ -1265,8 +1340,12 @@ async function buscarBusesPorParada() {
             const delay = computeBusDelay(prevStop, nextStop, prevStop?stopsData.get(prevStop.stop_id):null,
                                           stopsData.get(nextStop.stop_id), live.lat, live.lon, live.recordedAtTimeISO);
             if (delay !== null) {
-              estSec = timeToSeconds(st.departure_time) + delay;
-              const dm = Math.round(delay/60);
+              const ts = getTripStops(st.trip_id);
+              const ia = ts.findIndex(s => s.stop_id === live.stopPointRef);
+              const ib = ts.findIndex(s => s.stop_sequence === st.stop_sequence);
+              const total = delay + (ia >= 0 && ib > ia ? driftEntre(ts, ia, ib) : 0); // retraso actual + lo que suele variar hasta aquí
+              estSec = timeToSeconds(st.departure_time) + total;
+              const dm = Math.round(total/60);
               if      (dm >  1) delayPill = `<span class="delay-pill delay">+${dm}m</span>`;
               else if (dm < -1) delayPill = `<span class="delay-pill advance">${dm}m</span>`;
               else { isBusOnTime = true; delayPill = `<span class="delay-pill on-time">● En hora</span>`; }
@@ -1773,16 +1852,20 @@ async function localizarBusEnTiempoReal(targetTripId, targetVehicleRef) {
 function renderStopList(stopsOnRoute) {
   const listEl = document.getElementById('route-stop-list');
   listEl.innerHTML = '';
-  stopsOnRoute.forEach(st => {
+  const k = currentBusStopIdRealTime ? stopsOnRoute.findIndex(s => s.stop_id === currentBusStopIdRealTime) : -1;
+  let extra = 0; // deriva acumulada desde la próxima parada del bus
+  stopsOnRoute.forEach((st, idx) => {
+    if (k >= 0 && idx > k) extra += driftTramo(stopsOnRoute[idx - 1], st);
     const info = stopsData.get(st.stop_id);
     if (!info) return;
     const name      = getCleanStopName(st.stop_id);
     const isCurrent = currentBusStopIdRealTime && st.stop_id === currentBusStopIdRealTime;
     let estHtml = '';
     if (currentBusDelayInSeconds !== null) {
-      const estSec = timeToSeconds(st.arrival_time) + currentBusDelayInSeconds;
-      estHtml = Math.abs(currentBusDelayInSeconds) > 60
-        ? `<span class="est">${secondsToTime(estSec)}</span>`
+      const d = currentBusDelayInSeconds + (k >= 0 && idx > k ? extra : 0);
+      const estSec = timeToSeconds(st.arrival_time) + d;
+      estHtml = Math.abs(d) > 60
+        ? `<span class="est"${extra ? ' title="Ajustado con tiempos reales de este tramo"' : ''}>${secondsToTime(estSec)}</span>`
         : `<span class="est" style="color:var(--green)">En hora</span>`;
     }
     const div = document.createElement('div');
@@ -1815,8 +1898,9 @@ async function mostrarRecorrido(tripId, shapeId) {
   document.getElementById('route-line-name').textContent = trip.route_id;
   document.getElementById('route-headsign').textContent  = '→ ' + trip.trip_headsign;
 
-  const stopsOnRoute = stopTimesData.filter(s=>s.trip_id===tripId).sort((a,b)=>a.stop_sequence-b.stop_sequence);
+  const stopsOnRoute = getTripStops(tripId);
   renderStopList(stopsOnRoute);
+  pedirTramos(pairsEntre(stopsOnRoute, 0, stopsOnRoute.length - 1)).then(() => renderStopList(stopsOnRoute)); // pinta de nuevo con los tiempos aprendidos
 
   const bounds = new L.LatLngBounds(), points = [];
   stopsOnRoute.forEach(st => {
