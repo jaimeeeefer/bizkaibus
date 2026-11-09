@@ -442,64 +442,98 @@ function computeBusDelay(prevStop, nextStop, prevInfo, nextInfo, busLat, busLon,
 
 // ═══════════════════════════════════════════════════════
 // TIEMPOS APRENDIDOS ENTRE PARADAS
-// El Worker mide cuánto tardan realmente los buses entre cada par de paradas (por tipo de día y hora).
-// Aquí se compara con el horario del GTFS: la diferencia es lo que el retraso suele crecer/bajar en ese
-// tramo. Con pocas muestras el efecto se atenúa; sin datos, no cambia nada (queda el retraso actual).
+// El Worker guarda «de la parada A a la B pasaron X s» entre lecturas consecutivas del SIRI (cada ~2 min), por tipo
+// de día y hora. Aquí se compara con el horario del GTFS: ritmo = Σ tiempo real / Σ tiempo del horario de esos
+// saltos. Si en una hora los buses van un 20 % más lentos que el horario, cada tramo se alarga un 20 %.
+// Sin datos fiables (pocas muestras, fallo del Worker o más de 2 s de espera) no cambia nada: método clásico.
 // ═══════════════════════════════════════════════════════
-const TRAMOS_MIN_N = 5, TRAMOS_TTL = 5 * 60 * 1000;
-const tramosCache = new Map();      // "A-B" → { t, d: { hora: [n, mediaSeg] } }
-const tripStopsCache = new Map();   // trip_id → paradas ordenadas
+const TRAMOS_MIN_N = 8, TRAMOS_TTL = 5 * 60 * 1000, TRAMOS_TIMEOUT = 2000, TRAMOS_MAX_SALTO = 8;
+const tramosCache = new Map();     // "A-B" → { hora: [n, mediaSeg] }
+const tramosVisto = new Map();     // stop_id → cuándo se pidió por última vez
+const tripStopsCache = new Map();  // trip_id → paradas ordenadas
+let tramosDt = null, driftMemo = new WeakMap();
 
-function dtHoy() { const d = new Date().getDay(); return d === 0 ? 2 : d === 6 ? 1 : 0; } // 0 L-V · 1 sáb · 2 dom
+const dtHoy = () => { const d = new Date().getDay(); return d === 0 ? 2 : d === 6 ? 1 : 0; }; // 0 L-V · 1 sáb · 2 dom
+const horaMadrid = () => +new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Madrid', hour: '2-digit', hourCycle: 'h23' }).format(new Date());
+const depSec = s => timeToSeconds(s.departure_time || s.arrival_time);
 
 function getTripStops(tripId) {
   let a = tripStopsCache.get(tripId);
-  if (!a) {
-    a = stopTimesData.filter(s => s.trip_id === tripId).sort((x, y) => x.stop_sequence - y.stop_sequence);
-    tripStopsCache.set(tripId, a);
-  }
+  if (!a) { a = stopTimesData.filter(s => s.trip_id === tripId).sort((x, y) => x.stop_sequence - y.stop_sequence); tripStopsCache.set(tripId, a); }
   return a;
 }
-const segKey = (a, b) => a.stop_id + '-' + b.stop_id;
-function pairsEntre(ts, i, j) { const p = []; for (let k = i; k < j; k++) p.push(segKey(ts[k], ts[k + 1])); return p; }
 
-async function pedirTramos(pairs) {
-  const now = Date.now();
-  const falta = [...new Set(pairs)].filter(p => !(tramosCache.get(p)?.t > now - TRAMOS_TTL));
-  for (let i = 0; i < falta.length; i += 120) {
-    const lote = falta.slice(i, i + 120);
+// Pide al Worker los datos de esas paradas. Espera como máximo 2 s; si falla, se sigue sin corrección.
+async function pedirTramos(stopIds, todasHoras = false) {
+  const now = Date.now(), dt = dtHoy();
+  if (tramosDt !== dt) { tramosCache.clear(); tramosVisto.clear(); tramosDt = dt; driftMemo = new WeakMap(); }
+  const falta = [...new Set(stopIds)].filter(id => todasHoras || !(tramosVisto.get(id) > now - TRAMOS_TTL));
+  const h0 = horaMadrid();
+  const hs = todasHoras ? [...Array(24).keys()] : [-1, 0, 1, 2].map(k => (h0 + k + 24) % 24);
+  for (let i = 0; i < falta.length; i += 85) {
+    const lote = falta.slice(i, i + 85), ctrl = new AbortController(), to = setTimeout(() => ctrl.abort(), TRAMOS_TIMEOUT);
     try {
-      const r = await fetch(`${TRAMOS_URL}?dt=${dtHoy()}&pairs=${encodeURIComponent(lote.join(','))}`);
-      const d = r.ok ? await r.json() : {};
-      lote.forEach(p => tramosCache.set(p, { t: now, d: d[p] || {} }));
-    } catch (e) { console.warn('tramos', e); }
+      const r = await fetch(`${TRAMOS_URL}?dt=${dt}&h=${hs.join(',')}&stops=${encodeURIComponent(lote.join(','))}`, { signal: ctrl.signal });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      for (const [k, v] of Object.entries(await r.json())) tramosCache.set(k, Object.assign(tramosCache.get(k) || {}, v));
+      if (!todasHoras) lote.forEach(id => tramosVisto.set(id, now));
+    } catch (e) {
+      console.warn('tramos:', e.name === 'AbortError' ? 'tiempo de espera agotado' : e);
+      if (!todasHoras) lote.forEach(id => tramosVisto.set(id, now - TRAMOS_TTL + 60000)); // reintento en 1 min
+      break; // si va lento o falla, no se espera por más lotes
+    } finally { clearTimeout(to); }
   }
+  driftMemo = new WeakMap();
 }
 
-// Segundos que, de media, el bus gana o pierde respecto al horario en el tramo a→b (0 si no hay datos fiables)
-function driftTramo(a, b) {
-  const dep = s => timeToSeconds(s.departure_time || s.arrival_time);
-  const sa = dep(a), sb = dep(b);
-  if (sa <= 0 || sb <= 0 || sb <= sa) return 0;
-  const datos = tramosCache.get(segKey(a, b))?.d;
-  if (!datos) return 0;
-  const h = Math.floor(sa / 3600) % 24;
-  let n = 0, suma = 0;
-  for (const hh of [h, (h + 23) % 24, (h + 1) % 24]) { // la hora propia pesa doble; las vecinas rellenan huecos
-    const e = datos[hh]; if (!e) continue;
-    const w = hh === h ? 2 : 1; n += e[0] * w; suma += e[0] * e[1] * w;
+// Segundos extra (o de menos) que suele llevar cada tramo i→i+1 del viaje respecto al horario
+function driftsTrip(ts) {
+  let dr = driftMemo.get(ts);
+  if (dr) return dr;
+  const m = ts.length - 1;
+  dr = new Array(Math.max(m, 0)).fill(0);
+  if (m > 0) {
+    const dep = ts.map(depSec), real = new Array(m).fill(0), hor = new Array(m).fill(0), cnt = new Array(m).fill(0);
+    for (let p = 0; p < m; p++) {
+      const h = Math.floor(dep[p] / 3600) % 24;
+      for (let q = p + 1; q <= Math.min(m, p + TRAMOS_MAX_SALTO); q++) {
+        const e = tramosCache.get(ts[p].stop_id + '-' + ts[q].stop_id)?.[h], sched = dep[q] - dep[p];
+        if (!e || sched <= 0) continue;
+        for (let i = p; i < q; i++) { real[i] += e[0] * e[1]; hor[i] += e[0] * sched; cnt[i] += e[0]; }
+      }
+    }
+    for (let i = 0; i < m; i++) {
+      if (cnt[i] < TRAMOS_MIN_N || hor[i] <= 0) continue;
+      const w = cnt[i] / (cnt[i] + 20);                                    // pocas muestras → efecto más pequeño
+      const ritmo = Math.max(0.6, Math.min(1.8, 1 + w * (real[i] / hor[i] - 1)));
+      dr[i] = (ritmo - 1) * Math.max(dep[i + 1] - dep[i], 0);
+    }
   }
-  if (n < TRAMOS_MIN_N) return 0;
-  const sched = sb - sa, cota = Math.max(sched, 60);
-  const raw = Math.max(-0.5 * cota, Math.min(1.5 * cota, suma / n - sched));
-  return raw * (n / (n + 10)); // pocas muestras → efecto más pequeño
+  driftMemo.set(ts, dr);
+  return dr;
 }
 
-// Retraso extra acumulado desde la parada i hasta la j del viaje (ts = paradas ordenadas)
-function driftEntre(ts, i, j) {
-  let t = 0;
-  for (let k = i; k < j; k++) t += driftTramo(ts[k], ts[k + 1]);
-  return t;
+// Retraso extra acumulado desde la parada i hasta la j del viaje
+function driftEntre(ts, i, j) { const dr = driftsTrip(ts); let t = 0; for (let k = i; k < j; k++) t += dr[k]; return t; }
+
+// Para consultar en la consola del navegador (F12): await tiempoEntre('3552','3762')
+// Muestra, por hora de salida, el tiempo del horario y el estimado con los datos aprendidos.
+async function tiempoEntre(a, b) {
+  const porHora = new Map();
+  for (const tid of new Set(stopTimesData.filter(s => s.stop_id === a).map(s => s.trip_id))) {
+    const ts = getTripStops(tid), ia = ts.findIndex(s => s.stop_id === a), ib = ts.findIndex(s => s.stop_id === b);
+    if (ia < 0 || ib <= ia) continue;
+    const h = Math.floor(depSec(ts[ia]) / 3600) % 24;
+    if (!porHora.has(h)) porHora.set(h, { ts, ia, ib });
+  }
+  if (!porHora.size) return console.warn('Ningún viaje pasa por ' + a + ' y luego por ' + b);
+  await pedirTramos([...porHora.values()].flatMap(v => v.ts.map(s => s.stop_id)), true);
+  const filas = [...porHora].sort((x, y) => x[0] - y[0]).map(([h, { ts, ia, ib }]) => {
+    const horario = depSec(ts[ib]) - depSec(ts[ia]), ajuste = Math.round(driftEntre(ts, ia, ib));
+    return { hora: h + ':00', horario_s: horario, estimado_s: horario + ajuste, ajuste_s: ajuste };
+  });
+  console.table(filas);
+  return filas;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1298,13 +1332,13 @@ async function buscarBusesPorParada() {
 
   // Tiempos aprendidos de los tramos que aún le faltan a cada bus hasta esta parada
   try {
-    const pares = [];
+    const ids = [];
     for (const [jref, live] of rtMap) {
       const ts = getTripStops(jref);
       const ia = ts.findIndex(s => s.stop_id === live.stopPointRef), ib = ts.findIndex(s => s.stop_id === stopId);
-      if (ia >= 0 && ib > ia) pares.push(...pairsEntre(ts, ia, ib));
+      if (ia >= 0 && ib > ia) for (let k = ia; k <= ib; k++) ids.push(ts[k].stop_id);
     }
-    if (pares.length) await pedirTramos(pares);
+    if (ids.length) await pedirTramos(ids); // espera máx. 2 s; si no llega, se pinta con el método clásico
   } catch (e) { console.warn('tramos parada', e); }
 
   // ── Helper: get scheduled trips for a stop on a given date/dow ──
@@ -1854,8 +1888,9 @@ function renderStopList(stopsOnRoute) {
   listEl.innerHTML = '';
   const k = currentBusStopIdRealTime ? stopsOnRoute.findIndex(s => s.stop_id === currentBusStopIdRealTime) : -1;
   let extra = 0; // deriva acumulada desde la próxima parada del bus
+  const drs = driftsTrip(stopsOnRoute);
   stopsOnRoute.forEach((st, idx) => {
-    if (k >= 0 && idx > k) extra += driftTramo(stopsOnRoute[idx - 1], st);
+    if (k >= 0 && idx > k) extra += drs[idx - 1];
     const info = stopsData.get(st.stop_id);
     if (!info) return;
     const name      = getCleanStopName(st.stop_id);
@@ -1900,7 +1935,7 @@ async function mostrarRecorrido(tripId, shapeId) {
 
   const stopsOnRoute = getTripStops(tripId);
   renderStopList(stopsOnRoute);
-  pedirTramos(pairsEntre(stopsOnRoute, 0, stopsOnRoute.length - 1)).then(() => renderStopList(stopsOnRoute)); // pinta de nuevo con los tiempos aprendidos
+  pedirTramos(stopsOnRoute.map(s => s.stop_id)).then(() => renderStopList(stopsOnRoute)); // pinta de nuevo con los tiempos aprendidos
 
   const bounds = new L.LatLngBounds(), points = [];
   stopsOnRoute.forEach(st => {
