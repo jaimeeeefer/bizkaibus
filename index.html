@@ -442,9 +442,8 @@ function computeBusDelay(prevStop, nextStop, prevInfo, nextInfo, busLat, busLon,
 
 // ═══════════════════════════════════════════════════════
 // TIEMPOS APRENDIDOS ENTRE PARADAS
-// El Worker guarda «de la parada A a la B pasaron X s» entre lecturas consecutivas del SIRI (cada ~2 min), por tipo
-// de día y hora. Aquí se compara con el horario del GTFS: ritmo = Σ tiempo real / Σ tiempo del horario de esos
-// saltos. Si en una hora los buses van un 20 % más lentos que el horario, cada tramo se alarga un 20 %.
+// El Worker guarda, por par de paradas A→B, tipo de día y hora, cuántas visitas hubo y cuántos segundos costaron
+// (con lecturas del SIRI cada ~2 min). Aquí se compara con el horario del GTFS: ritmo = Σ tiempo real / Σ horario. Si en una hora los buses van un 20 % más lentos que el horario, cada tramo se alarga un 20 %.
 // Sin datos fiables (pocas muestras, fallo del Worker o más de 2 s de espera) no cambia nada: método clásico.
 // ═══════════════════════════════════════════════════════
 const TRAMOS_MIN_N = 8, TRAMOS_TTL = 5 * 60 * 1000, TRAMOS_TIMEOUT = 2000, TRAMOS_MAX_SALTO = 8, TRAMOS_VENTANA = 3;
@@ -487,9 +486,9 @@ async function pedirTramos(stopIds, todasHoras = false) {
 }
 
 // Segundos extra (o de menos) que suele llevar cada tramo i→i+1 del viaje respecto al horario.
-// Cada dato del Worker es «entre dos lecturas, la próxima parada pasó de p a q (o no cambió) en X s».
-// Ritmo local = Σ tiempo real / Σ horario avanzado (p→q; 0 si no cambió), sumando TODAS las lecturas de una ventana
-// de paradas alrededor del tramo. Así los tramos largos cuentan bien: sus lecturas «sin cambio» aportan tiempo.
+// Cada dato del Worker es un par A→B: n visitas y suma de segundos que costó recorrerlo (incluye los saltos de varias
+// paradas y el tiempo que el bus siguió con la misma próxima parada). Ritmo local = Σ tiempo real / Σ horario de
+// esos mismos pares, sumando los pares de una ventana de paradas alrededor del tramo.
 function driftsTrip(ts) {
   let dr = driftMemo.get(ts);
   if (dr) return dr;
@@ -497,18 +496,17 @@ function driftsTrip(ts) {
   dr = new Array(Math.max(m, 0)).fill(0);
   if (m > 0) {
     const dep = ts.map(depSec), E = [];
-    for (let p = 0; p <= m; p++) {
+    for (let p = 0; p < m; p++) {
       const h = Math.floor(dep[p] / 3600) % 24;
-      for (let q = p; q <= Math.min(m, p + TRAMOS_MAX_SALTO); q++) {
-        const e = tramosCache.get(ts[p].stop_id + '-' + ts[q].stop_id)?.[h];
-        if (e && !(p === q && (p === 0 || p === m))) E.push({   // sin cambio en cabecera/final = espera en terminal, no cuenta
-           p, q, n: e[0], real: e[0] * e[1], sch: e[0] * Math.max(dep[q] - dep[p], 0) });
+      for (let q = p + 1; q <= Math.min(m - 1, p + TRAMOS_MAX_SALTO); q++) {   // sin pares hacia la última parada: ahí el bus espera y falsea el tiempo
+        const e = tramosCache.get(ts[p].stop_id + '-' + ts[q].stop_id)?.[h], sch = dep[q] - dep[p];
+        if (e && e[0] > 0 && sch > 0) E.push({ p, q, n: e[0], real: e[0] * e[1], sch: e[0] * sch });
       }
     }
     for (let i = 0; i < m - 2; i++) {                                      // los 2 últimos tramos se dejan sin ajustar: al acabar el viaje faltan lecturas y saldría sesgado
       const lo = Math.max(0, i - TRAMOS_VENTANA), hi = Math.min(m, i + 1 + TRAMOS_VENTANA);
       let n = 0, real = 0, sch = 0;
-      for (const x of E) if (x.p >= lo && x.q <= hi && (x.p < x.q || x.p > lo)) { n += x.n; real += x.real; sch += x.sch; } // sin cambio en p = lo es tiempo del tramo anterior, fuera de la ventana
+      for (const x of E) if (x.p >= lo && x.q <= hi) { n += x.n; real += x.real; sch += x.sch; }
       if (n < TRAMOS_MIN_N || sch <= 0) continue;
       const w = n / (n + 20);                                              // pocas muestras → efecto más pequeño
       const ritmo = Math.max(0.6, Math.min(1.8, 1 + w * (real / sch - 1)));
