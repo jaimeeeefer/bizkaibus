@@ -614,6 +614,9 @@ function clearMapElements() {
   if (realTimeBusMarker) { map.removeLayer(realTimeBusMarker); realTimeBusMarker = null; }
   linePolylines.forEach(p => map.removeLayer(p)); linePolylines = [];
   stopMarkers.forEach(m => map.removeLayer(m));   stopMarkers   = [];
+  const btnInfo = document.getElementById('btn-info-bus');
+  if (btnInfo) btnInfo.style.display = 'none';
+  hideBusInfoCard();
 }
 function clearLineMarkers() { markers.forEach(m => map.removeLayer(m)); markers = []; }
 
@@ -880,7 +883,7 @@ function showPanel(name) {
   btnShareLinea.style.display = name === 'line' ? 'inline-block' : 'none';
   if (btnShareBus) btnShareBus.style.display = name === 'route' ? 'inline-block' : 'none';
   const btnInfoBus = document.getElementById('btn-info-bus');
-  if (btnInfoBus) btnInfoBus.style.display = name === 'route' ? 'inline-block' : 'none';
+  if (btnInfoBus) btnInfoBus.style.display = 'none';
   hideBusInfoCard();
   if (btnFavBus) {
     if (name === 'route') {
@@ -1662,7 +1665,8 @@ async function buscarBusPorNumero() {
     updateBusFavBtnState(input);
     const infoBus = busInfoMap.get(input);
     const btnInfo = document.getElementById('btn-info-bus');
-    if (btnInfo) btnInfo.style.display = 'none'; // la tarjeta ya se muestra abajo
+    if (btnInfo) btnInfo.style.display = 'none';
+    hideBusInfoCard();
     const cardHTML = infoBus ? busInfoCardHTML(input, infoBus, true) : '';
     document.getElementById('route-stop-list').innerHTML = `
       ${cardHTML}
@@ -1703,10 +1707,15 @@ function toggleBusInfo() {
   if (!card) return;
   if (card.style.display !== 'none') { hideBusInfoCard(); return; }
   const num  = (document.getElementById('numBus').value || currentBusSearch || '').trim();
+  if (!num || !/^\d+$/.test(num)) {
+    hideBusInfoCard();
+    if (btn) btn.style.display = 'none';
+    return;
+  }
   const info = busInfoMap.get(num);
   card.innerHTML = info
     ? busInfoCardHTML(num, info, false)
-    : `<div class="empty-state" style="padding:12px 10px;">No hay datos de la flota para el bus ${num || ''}.</div>`;
+    : `<div class="empty-state" style="padding:12px 10px;">No hay datos de la flota para el bus ${num}.</div>`;
   card.style.display = 'block';
   if (btn) btn.classList.add('info-active');
 }
@@ -1851,6 +1860,8 @@ async function localizarBusEnTiempoReal(targetTripId, targetVehicleRef) {
           document.getElementById('numBus').value = vref;
         }
         updateBusFavBtnState(vref);
+        const btnInfo = document.getElementById('btn-info-bus');
+        if (btnInfo) btnInfo.style.display = 'inline-block';
       }
       const lineaDisplay = jref && tripsData.has(jref) ? tripsData.get(jref).route_id : 'N/A';
       const destDisplay  = jref && tripsData.has(jref) ? tripsData.get(jref).trip_headsign : 'N/A';
@@ -1889,8 +1900,17 @@ async function localizarBusEnTiempoReal(targetTripId, targetVehicleRef) {
       return jref;
     }
     document.getElementById('delay-info').textContent = 'No localizado en tiempo real';
+    const btnInfo = document.getElementById('btn-info-bus');
+    if (btnInfo) btnInfo.style.display = 'none';
+    hideBusInfoCard();
     return null;
-  } catch(e) { console.error(e); return null; }
+  } catch(e) {
+    console.error(e);
+    const btnInfo = document.getElementById('btn-info-bus');
+    if (btnInfo) btnInfo.style.display = 'none';
+    hideBusInfoCard();
+    return null;
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1935,11 +1955,10 @@ async function mostrarRecorrido(tripId, shapeId) {
   linePolylines.forEach(p => map.removeLayer(p)); linePolylines = [];
   showPanel('route');
 
-  const busNum = currentBusSearch || (document.getElementById('numBus') ? document.getElementById('numBus').value.trim() : null);
-  if (busNum && /^\d+$/.test(busNum)) {
-    currentBusSearch = busNum;
-    updateBusFavBtnState(busNum);
-  }
+  const inputNum = document.getElementById('numBus') ? document.getElementById('numBus').value.trim() : '';
+  const busNum = (inputNum && /^\d+$/.test(inputNum)) ? inputNum : null;
+  currentBusSearch = busNum;
+  updateBusFavBtnState(busNum);
 
   const trip = tripsData.get(tripId);
   if (!trip) return;
@@ -1967,11 +1986,21 @@ async function mostrarRecorrido(tripId, shapeId) {
   }
 
   if (currentBusDelayInSeconds === null || currentBusStopIdRealTime === null) {
-    await localizarBusEnTiempoReal(tripId, null);
+    const localizedTrip = await localizarBusEnTiempoReal(tripId, null);
+    if (!localizedTrip) {
+      const btnInfo = document.getElementById('btn-info-bus');
+      if (btnInfo) btnInfo.style.display = 'none';
+      hideBusInfoCard();
+      updateBusFavBtnState(null);
+    }
     renderStopList(stopsOnRoute);
     if (realTimeBusMarker && bounds.isValid()) { bounds.extend(realTimeBusMarker.getLatLng()); map.fitBounds(bounds,{padding:[70,70]}); }
   } else if (realTimeBusMarker && bounds.isValid()) {
     bounds.extend(realTimeBusMarker.getLatLng()); map.fitBounds(bounds,{padding:[70,70]});
+  } else {
+    const btnInfo = document.getElementById('btn-info-bus');
+    if (btnInfo) btnInfo.style.display = 'none';
+    hideBusInfoCard();
   }
 }
 
