@@ -504,7 +504,7 @@ function driftsTrip(ts) {
         if (e && e[0] > 0 && sch > 0) E.push({ p, q, n: e[0], real: e[0] * e[1], sch: e[0] * sch });
       }
     }
-    for (let i = 0; i < m - 2; i++) {                                      // los 2 últimos tramos se dejan sin ajustar: al acabar el viaje faltan lecturas y saldría sesgado
+    for (let i = 0; i < m - 1; i++) {   // solo el último tramo (→ terminal) queda sin ajustar
       const lo = Math.max(0, i - TRAMOS_VENTANA), hi = Math.min(m, i + 1 + TRAMOS_VENTANA);
       let n = 0, real = 0, sch = 0;
       for (const x of E) if (x.p >= lo && x.q <= hi) { n += x.n; real += x.real; sch += x.sch; }
