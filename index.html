@@ -496,6 +496,7 @@ function driftsTrip(ts) {
   dr = new Array(Math.max(m, 0)).fill(0);
   if (m > 0) {
     const dep = ts.map(depSec), E = [];
+    dr.n = new Array(m).fill(0); // nº de visitas de la ventana de cada tramo (para consultarlo en tiempoEntre)
     for (let p = 0; p < m; p++) {
       const h = Math.floor(dep[p] / 3600) % 24;
       for (let q = p + 1; q <= Math.min(m - 1, p + TRAMOS_MAX_SALTO); q++) {   // sin pares hacia la última parada: ahí el bus espera y falsea el tiempo
@@ -507,9 +508,10 @@ function driftsTrip(ts) {
       const lo = Math.max(0, i - TRAMOS_VENTANA), hi = Math.min(m, i + 1 + TRAMOS_VENTANA);
       let n = 0, real = 0, sch = 0;
       for (const x of E) if (x.p >= lo && x.q <= hi) { n += x.n; real += x.real; sch += x.sch; }
+      dr.n[i] = n;
       if (n < TRAMOS_MIN_N || sch <= 0) continue;
       const w = n / (n + 20);                                              // pocas muestras → efecto más pequeño
-      const ritmo = Math.max(0.6, Math.min(1.8, 1 + w * (real / sch - 1)));
+      const ritmo = Math.max(0.25, Math.min(3, 1 + w * (real / sch - 1)));
       dr[i] = (ritmo - 1) * Math.max(dep[i + 1] - dep[i], 0);
     }
   }
@@ -521,7 +523,8 @@ function driftsTrip(ts) {
 function driftEntre(ts, i, j) { const dr = driftsTrip(ts); let t = 0; for (let k = i; k < j; k++) t += dr[k]; return t; }
 
 // Para consultar en la consola del navegador (F12): await tiempoEntre('3552','3762')
-// Muestra, por hora de salida, el tiempo del horario y el estimado con los datos aprendidos.
+// Muestra, por hora de salida: horario, estimado con lo aprendido, ajuste, `visitas` (veces que se ha registrado el tramo)
+// y `n_ventana` (visitas de la zona que cuentan para el ajuste; hacen falta TRAMOS_MIN_N).
 async function tiempoEntre(a, b) {
   const porHora = new Map();
   for (const tid of new Set(stopTimesData.filter(s => s.stop_id === a).map(s => s.trip_id))) {
@@ -533,8 +536,14 @@ async function tiempoEntre(a, b) {
   if (!porHora.size) return console.warn('Ningún viaje pasa por ' + a + ' y luego por ' + b);
   await pedirTramos([...porHora.values()].flatMap(v => v.ts.map(s => s.stop_id)), true);
   const filas = [...porHora].sort((x, y) => x[0] - y[0]).map(([h, { ts, ia, ib }]) => {
-    const horario = depSec(ts[ib]) - depSec(ts[ia]), ajuste = Math.round(driftEntre(ts, ia, ib));
-    return { hora: h + ':00', horario_s: horario, estimado_s: horario + ajuste, ajuste_s: ajuste };
+    const horario = depSec(ts[ib]) - depSec(ts[ia]), ajuste = Math.round(driftEntre(ts, ia, ib)), dr = driftsTrip(ts);
+    let visitas = Infinity, nVentana = Infinity; // si hay varios tramos entre a y b se muestra el que menos tiene
+    for (let k = ia; k < ib; k++) {
+      const hk = Math.floor(depSec(ts[k]) / 3600) % 24;
+      visitas = Math.min(visitas, tramosCache.get(ts[k].stop_id + '-' + ts[k + 1].stop_id)?.[hk]?.[0] || 0);
+      nVentana = Math.min(nVentana, dr.n[k] || 0);
+    }
+    return { hora: h + ':00', horario_s: horario, estimado_s: horario + ajuste, ajuste_s: ajuste, visitas, n_ventana: nVentana };
   });
   console.table(filas);
   return filas;
