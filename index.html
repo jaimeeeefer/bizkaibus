@@ -1978,7 +1978,7 @@ async function mostrarRecorrido(tripId, shapeId) {
     const mk = L.marker([info.stop_lat, info.stop_lon], {icon:stopIcon}).addTo(map);
     const stopName = getCleanStopName(st.stop_id);
     const stopNameEsc = stopName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    mk.bindPopup(`<b><a href="#" onclick="rellenarYBuscarParada('${st.stop_id}','${stopNameEsc}');return false" style="color:var(--ink);text-decoration:none">${stopName}</a></b><br><b>ID:</b> <a href="#" onclick="rellenarYBuscarParada('${st.stop_id}','${stopNameEsc}');return false" style="color:var(--accent);font-weight:700;text-decoration:underline">${st.stop_id}</a><br>Llegada: ${st.arrival_time}`);
+    mk.bindPopup(`<b><a href="#" onclick="rellenarYBuscarParada('${st.stop_id}','${stopNameEsc}');return false" style="color:inherit;text-decoration:none">${stopName}</a></b><br><b>ID:</b> <a href="#" onclick="rellenarYBuscarParada('${st.stop_id}','${stopNameEsc}');return false">${st.stop_id}</a><br>Llegada: ${st.arrival_time}`);
     stopMarkers.push(mk);
     points.push([info.stop_lat, info.stop_lon]);
     bounds.extend([info.stop_lat, info.stop_lon]);
