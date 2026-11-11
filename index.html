@@ -510,7 +510,7 @@ function driftsTrip(ts) {
       for (const x of E) if (x.p >= lo && x.q <= hi) { n += x.n; real += x.real; sch += x.sch; }
       dr.n[i] = n;
       if (n < TRAMOS_MIN_N || sch <= 0) continue;
-      const w = n / (n + 20);                                              // pocas muestras → efecto más pequeño
+      const w = n / (n + 10);                                              // pocas muestras → efecto más pequeño
       const ritmo = Math.max(0.25, Math.min(3, 1 + w * (real / sch - 1)));
       dr[i] = (ritmo - 1) * Math.max(dep[i + 1] - dep[i], 0);
     }
