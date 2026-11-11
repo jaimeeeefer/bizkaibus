@@ -1659,8 +1659,10 @@ async function buscarBusPorNumero() {
   const foundTripId = await localizarBusEnTiempoReal(null, input);
   if (foundTripId) {
     const trip = tripsData.get(foundTripId);
-    if (trip) mostrarRecorrido(foundTripId, trip.shape_id);
+    if (trip) await mostrarRecorrido(foundTripId, trip.shape_id);
     updateBusFavBtnState(input);
+    const btnInfo = document.getElementById('btn-info-bus');
+    if (btnInfo) btnInfo.style.display = 'inline-block';
   } else {
     updateBusFavBtnState(input);
     const infoBus = busInfoMap.get(input);
@@ -1706,7 +1708,7 @@ function toggleBusInfo() {
   const btn  = document.getElementById('btn-info-bus');
   if (!card) return;
   if (card.style.display !== 'none') { hideBusInfoCard(); return; }
-  const num  = (document.getElementById('numBus').value || currentBusSearch || '').trim();
+  const num  = (currentBusSearch || (document.getElementById('numBus') ? document.getElementById('numBus').value : '') || '').trim();
   if (!num || !/^\d+$/.test(num)) {
     hideBusInfoCard();
     if (btn) btn.style.display = 'none';
@@ -1974,7 +1976,9 @@ async function mostrarRecorrido(tripId, shapeId) {
     const info = stopsData.get(st.stop_id);
     if (!info) return;
     const mk = L.marker([info.stop_lat, info.stop_lon], {icon:stopIcon}).addTo(map);
-    mk.bindPopup(`<b>${getCleanStopName(st.stop_id)}</b><br>ID: ${st.stop_id}<br>Llegada: ${st.arrival_time}`);
+    const stopName = getCleanStopName(st.stop_id);
+    const stopNameEsc = stopName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    mk.bindPopup(`<b><a href="#" onclick="rellenarYBuscarParada('${st.stop_id}','${stopNameEsc}');return false" style="color:var(--ink);text-decoration:none">${stopName}</a></b><br><b>ID:</b> <a href="#" onclick="rellenarYBuscarParada('${st.stop_id}','${stopNameEsc}');return false" style="color:var(--accent);font-weight:700;text-decoration:underline">${st.stop_id}</a><br>Llegada: ${st.arrival_time}`);
     stopMarkers.push(mk);
     points.push([info.stop_lat, info.stop_lon]);
     bounds.extend([info.stop_lat, info.stop_lon]);
@@ -1987,7 +1991,10 @@ async function mostrarRecorrido(tripId, shapeId) {
 
   if (currentBusDelayInSeconds === null || currentBusStopIdRealTime === null) {
     const localizedTrip = await localizarBusEnTiempoReal(tripId, null);
-    if (!localizedTrip) {
+    if (localizedTrip && realTimeBusMarker) {
+      const btnInfo = document.getElementById('btn-info-bus');
+      if (btnInfo) btnInfo.style.display = 'inline-block';
+    } else {
       const btnInfo = document.getElementById('btn-info-bus');
       if (btnInfo) btnInfo.style.display = 'none';
       hideBusInfoCard();
@@ -1995,8 +2002,10 @@ async function mostrarRecorrido(tripId, shapeId) {
     }
     renderStopList(stopsOnRoute);
     if (realTimeBusMarker && bounds.isValid()) { bounds.extend(realTimeBusMarker.getLatLng()); map.fitBounds(bounds,{padding:[70,70]}); }
-  } else if (realTimeBusMarker && bounds.isValid()) {
-    bounds.extend(realTimeBusMarker.getLatLng()); map.fitBounds(bounds,{padding:[70,70]});
+  } else if (realTimeBusMarker) {
+    const btnInfo = document.getElementById('btn-info-bus');
+    if (btnInfo) btnInfo.style.display = 'inline-block';
+    if (bounds.isValid()) { bounds.extend(realTimeBusMarker.getLatLng()); map.fitBounds(bounds,{padding:[70,70]}); }
   } else {
     const btnInfo = document.getElementById('btn-info-bus');
     if (btnInfo) btnInfo.style.display = 'none';
