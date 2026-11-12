@@ -446,7 +446,7 @@ function computeBusDelay(prevStop, nextStop, prevInfo, nextInfo, busLat, busLon,
 // (con lecturas del SIRI cada ~2 min). Aquí se compara con el horario del GTFS: ritmo = Σ tiempo real / Σ horario. Si en una hora los buses van un 20 % más lentos que el horario, cada tramo se alarga un 20 %.
 // Sin datos fiables (pocas muestras, fallo del Worker o más de 2 s de espera) no cambia nada: método clásico.
 // ═══════════════════════════════════════════════════════
-const TRAMOS_MIN_N = 8, TRAMOS_TTL = 5 * 60 * 1000, TRAMOS_TIMEOUT = 2000, TRAMOS_MAX_SALTO = 8, TRAMOS_VENTANA = 3;
+const TRAMOS_MIN_N = 8, TRAMOS_TTL = 5 * 60 * 1000, TRAMOS_TIMEOUT = 2000, TRAMOS_MAX_SALTO = 8, TRAMOS_VENTANA = 3, TRAMOS_PRIOR = 4, TRAMOS_LARGO = 150;
 const tramosCache = new Map();     // "A-B" → { hora: [n, mediaSeg] }
 const tramosVisto = new Map();     // stop_id → cuándo se pidió por última vez
 const tripStopsCache = new Map();  // trip_id → paradas ordenadas
@@ -504,14 +504,19 @@ function driftsTrip(ts) {
         if (e && e[0] > 0 && sch > 0) E.push({ p, q, n: e[0], real: e[0] * e[1], sch: e[0] * sch });
       }
     }
-    for (let i = 0; i < m - 1; i++) {   // solo el último tramo (→ terminal) queda sin ajustar
+    for (let i = 0; i < m - 2; i++) {                                      // los 2 últimos tramos se dejan sin ajustar: al acabar el viaje faltan lecturas y saldría sesgado
       const lo = Math.max(0, i - TRAMOS_VENTANA), hi = Math.min(m, i + 1 + TRAMOS_VENTANA);
-      let n = 0, real = 0, sch = 0;
-      for (const x of E) if (x.p >= lo && x.q <= hi) { n += x.n; real += x.real; sch += x.sch; }
+      let n = 0, real = 0, sch = 0, nP = 0, realP = 0, schP = 0;
+      for (const x of E) if (x.p >= lo && x.q <= hi) {
+        n += x.n; real += x.real; sch += x.sch;
+        if (x.p === i && x.q === i + 1 && dep[i + 1] - dep[i] >= TRAMOS_LARGO) { nP += x.n; realP += x.real; schP += x.sch; } // el propio tramo, solo si es largo: en los cortos (< ~2 lecturas) solo se registran las visitas más lentas y saldría inflado
+      }
       dr.n[i] = n;
       if (n < TRAMOS_MIN_N || sch <= 0) continue;
+      const rZona = real / sch, rPropio = schP > 0 ? realP / schP : rZona;
+      const rMezcla = (nP * rPropio + TRAMOS_PRIOR * rZona) / (nP + TRAMOS_PRIOR); // el tramo manda según sus visitas; la zona rellena lo que le falta
       const w = n / (n + 10);                                              // pocas muestras → efecto más pequeño
-      const ritmo = Math.max(0.25, Math.min(3, 1 + w * (real / sch - 1)));
+      const ritmo = Math.max(0.25, Math.min(3, 1 + w * (rMezcla - 1)));
       dr[i] = (ritmo - 1) * Math.max(dep[i + 1] - dep[i], 0);
     }
   }
@@ -523,7 +528,8 @@ function driftsTrip(ts) {
 function driftEntre(ts, i, j) { const dr = driftsTrip(ts); let t = 0; for (let k = i; k < j; k++) t += dr[k]; return t; }
 
 // Para consultar en la consola del navegador (F12): await tiempoEntre('3552','3762')
-// Muestra, por hora de salida: horario, estimado con lo aprendido, ajuste, `visitas` (veces que se ha registrado el tramo)
+// Muestra, por hora de salida: horario, estimado con lo aprendido, ajuste, `medido_s` (lo que tardan de media los buses, medido
+// tramo a tramo; vacío si algún tramo no tiene datos), `visitas` (veces que se ha registrado el tramo)
 // y `n_ventana` (visitas de la zona que cuentan para el ajuste; hacen falta TRAMOS_MIN_N).
 async function tiempoEntre(a, b) {
   const porHora = new Map();
@@ -531,19 +537,21 @@ async function tiempoEntre(a, b) {
     const ts = getTripStops(tid), ia = ts.findIndex(s => s.stop_id === a), ib = ts.findIndex(s => s.stop_id === b);
     if (ia < 0 || ib <= ia) continue;
     const h = Math.floor(depSec(ts[ia]) / 3600) % 24;
-    if (!porHora.has(h)) porHora.set(h, { ts, ia, ib });
+    const previo = porHora.get(h), alFinal = ib >= ts.length - 2; // cerca del final del viaje no se ajusta
+    if (!previo || (previo.alFinal && !alFinal)) porHora.set(h, { ts, ia, ib, alFinal }); // se prefiere un viaje donde sí se ajusta
   }
   if (!porHora.size) return console.warn('Ningún viaje pasa por ' + a + ' y luego por ' + b);
   await pedirTramos([...porHora.values()].flatMap(v => v.ts.map(s => s.stop_id)), true);
-  const filas = [...porHora].sort((x, y) => x[0] - y[0]).map(([h, { ts, ia, ib }]) => {
+  const filas = [...porHora].sort((x, y) => x[0] - y[0]).map(([h, { ts, ia, ib, alFinal }]) => {
     const horario = depSec(ts[ib]) - depSec(ts[ia]), ajuste = Math.round(driftEntre(ts, ia, ib)), dr = driftsTrip(ts);
-    let visitas = Infinity, nVentana = Infinity; // si hay varios tramos entre a y b se muestra el que menos tiene
+    let visitas = Infinity, nVentana = Infinity, medido = 0, faltan = false; // si hay varios tramos se muestra el que menos tiene
     for (let k = ia; k < ib; k++) {
-      const hk = Math.floor(depSec(ts[k]) / 3600) % 24;
-      visitas = Math.min(visitas, tramosCache.get(ts[k].stop_id + '-' + ts[k + 1].stop_id)?.[hk]?.[0] || 0);
+      const hk = Math.floor(depSec(ts[k]) / 3600) % 24, e = tramosCache.get(ts[k].stop_id + '-' + ts[k + 1].stop_id)?.[hk];
+      visitas = Math.min(visitas, e?.[0] || 0);
       nVentana = Math.min(nVentana, dr.n[k] || 0);
+      if (e) medido += e[1]; else faltan = true;
     }
-    return { hora: h + ':00', horario_s: horario, estimado_s: horario + ajuste, ajuste_s: ajuste, visitas, n_ventana: nVentana };
+    return { hora: h + ':00', horario_s: horario, estimado_s: horario + ajuste, ajuste_s: ajuste, medido_s: faltan ? '' : Math.round(medido), visitas, n_ventana: nVentana, nota: alFinal ? 'cerca del final del viaje: sin ajuste' : '' };
   });
   console.table(filas);
   return filas;
@@ -614,9 +622,6 @@ function clearMapElements() {
   if (realTimeBusMarker) { map.removeLayer(realTimeBusMarker); realTimeBusMarker = null; }
   linePolylines.forEach(p => map.removeLayer(p)); linePolylines = [];
   stopMarkers.forEach(m => map.removeLayer(m));   stopMarkers   = [];
-  const btnInfo = document.getElementById('btn-info-bus');
-  if (btnInfo) btnInfo.style.display = 'none';
-  hideBusInfoCard();
 }
 function clearLineMarkers() { markers.forEach(m => map.removeLayer(m)); markers = []; }
 
@@ -883,7 +888,7 @@ function showPanel(name) {
   btnShareLinea.style.display = name === 'line' ? 'inline-block' : 'none';
   if (btnShareBus) btnShareBus.style.display = name === 'route' ? 'inline-block' : 'none';
   const btnInfoBus = document.getElementById('btn-info-bus');
-  if (btnInfoBus) btnInfoBus.style.display = 'none';
+  if (btnInfoBus) btnInfoBus.style.display = name === 'route' ? 'inline-block' : 'none';
   hideBusInfoCard();
   if (btnFavBus) {
     if (name === 'route') {
@@ -1659,16 +1664,13 @@ async function buscarBusPorNumero() {
   const foundTripId = await localizarBusEnTiempoReal(null, input);
   if (foundTripId) {
     const trip = tripsData.get(foundTripId);
-    if (trip) await mostrarRecorrido(foundTripId, trip.shape_id);
+    if (trip) mostrarRecorrido(foundTripId, trip.shape_id);
     updateBusFavBtnState(input);
-    const btnInfo = document.getElementById('btn-info-bus');
-    if (btnInfo) btnInfo.style.display = 'inline-block';
   } else {
     updateBusFavBtnState(input);
     const infoBus = busInfoMap.get(input);
     const btnInfo = document.getElementById('btn-info-bus');
-    if (btnInfo) btnInfo.style.display = 'none';
-    hideBusInfoCard();
+    if (btnInfo) btnInfo.style.display = 'none'; // la tarjeta ya se muestra abajo
     const cardHTML = infoBus ? busInfoCardHTML(input, infoBus, true) : '';
     document.getElementById('route-stop-list').innerHTML = `
       ${cardHTML}
@@ -1708,16 +1710,11 @@ function toggleBusInfo() {
   const btn  = document.getElementById('btn-info-bus');
   if (!card) return;
   if (card.style.display !== 'none') { hideBusInfoCard(); return; }
-  const num  = (currentBusSearch || (document.getElementById('numBus') ? document.getElementById('numBus').value : '') || '').trim();
-  if (!num || !/^\d+$/.test(num)) {
-    hideBusInfoCard();
-    if (btn) btn.style.display = 'none';
-    return;
-  }
+  const num  = (document.getElementById('numBus').value || currentBusSearch || '').trim();
   const info = busInfoMap.get(num);
   card.innerHTML = info
     ? busInfoCardHTML(num, info, false)
-    : `<div class="empty-state" style="padding:12px 10px;">No hay datos de la flota para el bus ${num}.</div>`;
+    : `<div class="empty-state" style="padding:12px 10px;">No hay datos de la flota para el bus ${num || ''}.</div>`;
   card.style.display = 'block';
   if (btn) btn.classList.add('info-active');
 }
@@ -1862,8 +1859,6 @@ async function localizarBusEnTiempoReal(targetTripId, targetVehicleRef) {
           document.getElementById('numBus').value = vref;
         }
         updateBusFavBtnState(vref);
-        const btnInfo = document.getElementById('btn-info-bus');
-        if (btnInfo) btnInfo.style.display = 'inline-block';
       }
       const lineaDisplay = jref && tripsData.has(jref) ? tripsData.get(jref).route_id : 'N/A';
       const destDisplay  = jref && tripsData.has(jref) ? tripsData.get(jref).trip_headsign : 'N/A';
@@ -1902,17 +1897,8 @@ async function localizarBusEnTiempoReal(targetTripId, targetVehicleRef) {
       return jref;
     }
     document.getElementById('delay-info').textContent = 'No localizado en tiempo real';
-    const btnInfo = document.getElementById('btn-info-bus');
-    if (btnInfo) btnInfo.style.display = 'none';
-    hideBusInfoCard();
     return null;
-  } catch(e) {
-    console.error(e);
-    const btnInfo = document.getElementById('btn-info-bus');
-    if (btnInfo) btnInfo.style.display = 'none';
-    hideBusInfoCard();
-    return null;
-  }
+  } catch(e) { console.error(e); return null; }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1957,10 +1943,11 @@ async function mostrarRecorrido(tripId, shapeId) {
   linePolylines.forEach(p => map.removeLayer(p)); linePolylines = [];
   showPanel('route');
 
-  const inputNum = document.getElementById('numBus') ? document.getElementById('numBus').value.trim() : '';
-  const busNum = (inputNum && /^\d+$/.test(inputNum)) ? inputNum : null;
-  currentBusSearch = busNum;
-  updateBusFavBtnState(busNum);
+  const busNum = currentBusSearch || (document.getElementById('numBus') ? document.getElementById('numBus').value.trim() : null);
+  if (busNum && /^\d+$/.test(busNum)) {
+    currentBusSearch = busNum;
+    updateBusFavBtnState(busNum);
+  }
 
   const trip = tripsData.get(tripId);
   if (!trip) return;
@@ -1976,9 +1963,7 @@ async function mostrarRecorrido(tripId, shapeId) {
     const info = stopsData.get(st.stop_id);
     if (!info) return;
     const mk = L.marker([info.stop_lat, info.stop_lon], {icon:stopIcon}).addTo(map);
-    const stopName = getCleanStopName(st.stop_id);
-    const stopNameEsc = stopName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    mk.bindPopup(`<b><a href="#" onclick="rellenarYBuscarParada('${st.stop_id}','${stopNameEsc}');return false" style="color:inherit;text-decoration:none">${stopName}</a></b><br><b>ID:</b> <a href="#" onclick="rellenarYBuscarParada('${st.stop_id}','${stopNameEsc}');return false">${st.stop_id}</a><br>Llegada: ${st.arrival_time}`);
+    mk.bindPopup(`<b>${getCleanStopName(st.stop_id)}</b><br>ID: ${st.stop_id}<br>Llegada: ${st.arrival_time}`);
     stopMarkers.push(mk);
     points.push([info.stop_lat, info.stop_lon]);
     bounds.extend([info.stop_lat, info.stop_lon]);
@@ -1990,26 +1975,11 @@ async function mostrarRecorrido(tripId, shapeId) {
   }
 
   if (currentBusDelayInSeconds === null || currentBusStopIdRealTime === null) {
-    const localizedTrip = await localizarBusEnTiempoReal(tripId, null);
-    if (localizedTrip && realTimeBusMarker) {
-      const btnInfo = document.getElementById('btn-info-bus');
-      if (btnInfo) btnInfo.style.display = 'inline-block';
-    } else {
-      const btnInfo = document.getElementById('btn-info-bus');
-      if (btnInfo) btnInfo.style.display = 'none';
-      hideBusInfoCard();
-      updateBusFavBtnState(null);
-    }
+    await localizarBusEnTiempoReal(tripId, null);
     renderStopList(stopsOnRoute);
     if (realTimeBusMarker && bounds.isValid()) { bounds.extend(realTimeBusMarker.getLatLng()); map.fitBounds(bounds,{padding:[70,70]}); }
-  } else if (realTimeBusMarker) {
-    const btnInfo = document.getElementById('btn-info-bus');
-    if (btnInfo) btnInfo.style.display = 'inline-block';
-    if (bounds.isValid()) { bounds.extend(realTimeBusMarker.getLatLng()); map.fitBounds(bounds,{padding:[70,70]}); }
-  } else {
-    const btnInfo = document.getElementById('btn-info-bus');
-    if (btnInfo) btnInfo.style.display = 'none';
-    hideBusInfoCard();
+  } else if (realTimeBusMarker && bounds.isValid()) {
+    bounds.extend(realTimeBusMarker.getLatLng()); map.fitBounds(bounds,{padding:[70,70]});
   }
 }
 
