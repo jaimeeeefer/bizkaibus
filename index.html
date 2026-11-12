@@ -454,7 +454,7 @@ function fraccionRestante(prevInfo, nextInfo, busLat, busLon) {
 // (con lecturas del SIRI cada ~2 min). Aquí se compara con el horario del GTFS: ritmo = Σ tiempo real / Σ horario. Si en una hora los buses van un 20 % más lentos que el horario, cada tramo se alarga un 20 %.
 // Sin datos fiables (pocas muestras, fallo del Worker o más de 2 s de espera) no cambia nada: método clásico.
 // ═══════════════════════════════════════════════════════
-const TRAMOS_MIN_N = 8, TRAMOS_TTL = 5 * 60 * 1000, TRAMOS_TIMEOUT = 2000, TRAMOS_MAX_SALTO = 8, TRAMOS_VENTANA = 3, TRAMOS_PRIOR = 4, TRAMOS_LARGO = 150;
+const TRAMOS_MIN_N = 8, TRAMOS_TTL = 5 * 60 * 1000, TRAMOS_TIMEOUT = 2000, TRAMOS_MAX_SALTO = 8, TRAMOS_VENTANA = 3, TRAMOS_PRIOR = 4, TRAMOS_LARGO = 180;
 const tramosCache = new Map();     // "A-B" → { hora: [n, mediaSeg] }
 const tramosVisto = new Map();     // stop_id → cuándo se pidió por última vez
 const tripStopsCache = new Map();  // trip_id → paradas ordenadas
@@ -1912,6 +1912,9 @@ async function localizarBusEnTiempoReal(targetTripId, targetVehicleRef) {
       return jref;
     }
     document.getElementById('delay-info').textContent = 'No localizado en tiempo real';
+    const btnInfoNL = document.getElementById('btn-info-bus');
+    if (btnInfoNL) btnInfoNL.style.display = 'none'; // sin tiempo real no hay botón de información
+    hideBusInfoCard();
     return null;
   } catch(e) { console.error(e); return null; }
 }
@@ -1979,7 +1982,8 @@ async function mostrarRecorrido(tripId, shapeId) {
     const info = stopsData.get(st.stop_id);
     if (!info) return;
     const mk = L.marker([info.stop_lat, info.stop_lon], {icon:stopIcon}).addTo(map);
-    mk.bindPopup(`<b>${getCleanStopName(st.stop_id)}</b><br>ID: ${st.stop_id}<br>Llegada: ${st.arrival_time}`);
+    const nombreParada = getCleanStopName(st.stop_id), nombreJs = String(nombreParada).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    mk.bindPopup(`<b>${nombreParada}</b><br>ID: <a href="#" onclick="rellenarYBuscarParada('${st.stop_id}','${nombreJs}');return false">${st.stop_id}</a><br>Llegada: ${st.arrival_time}`);
     stopMarkers.push(mk);
     points.push([info.stop_lat, info.stop_lon]);
     bounds.extend([info.stop_lat, info.stop_lon]);
