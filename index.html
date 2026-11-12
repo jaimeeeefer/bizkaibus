@@ -399,7 +399,7 @@ const stopIcon = L.icon({
 });
 
 let markers = [], stopMarkers = [], linePolylines = [], realTimeBusMarker = null;
-let currentBusDelayInSeconds = null, currentBusStopIdRealTime = null;
+let currentBusDelayInSeconds = null, currentBusStopIdRealTime = null, currentBusFracRemaining = 0.5;
 const COLORS = ['#00873D','#1565C0','#2E7D32','#E65100','#6A1B9A'];
 
 // ─── Haversine ──────────────────────────────────────────
@@ -439,6 +439,14 @@ function computeBusDelay(prevStop, nextStop, prevInfo, nextInfo, busLat, busLon,
   return actual - schedArr;
 }
 
+
+// Fracción del tramo actual (parada anterior → próxima) que le falta al bus por recorrer: 1 = acaba de salir, 0 = llegando
+function fraccionRestante(prevInfo, nextInfo, busLat, busLon) {
+  if (!prevInfo || !nextInfo || !Number.isFinite(busLat) || !Number.isFinite(busLon)) return 0.5;
+  const seg = haversineMetres(prevInfo.stop_lat, prevInfo.stop_lon, nextInfo.stop_lat, nextInfo.stop_lon);
+  const resto = haversineMetres(busLat, busLon, nextInfo.stop_lat, nextInfo.stop_lon);
+  return seg > 0 ? Math.min(1, Math.max(0, resto / seg)) : 0.5;
+}
 
 // ═══════════════════════════════════════════════════════
 // TIEMPOS APRENDIDOS ENTRE PARADAS
@@ -617,7 +625,7 @@ function todayDow() { return new Date().getDay(); }
 // MAP CLEANUP
 // ═══════════════════════════════════════════════════════
 function clearMapElements() {
-  currentBusDelayInSeconds = null; currentBusStopIdRealTime = null;
+  currentBusDelayInSeconds = null; currentBusStopIdRealTime = null; currentBusFracRemaining = 0.5;
   document.getElementById('delay-info').textContent = '';
   if (realTimeBusMarker) { map.removeLayer(realTimeBusMarker); realTimeBusMarker = null; }
   linePolylines.forEach(p => map.removeLayer(p)); linePolylines = [];
@@ -1398,7 +1406,12 @@ async function buscarBusesPorParada() {
               const ts = getTripStops(st.trip_id);
               const ia = ts.findIndex(s => s.stop_id === live.stopPointRef);
               const ib = ts.findIndex(s => s.stop_sequence === st.stop_sequence);
-              const total = delay + (ia >= 0 && ib > ia ? driftEntre(ts, ia, ib) : 0); // retraso actual + lo que suele variar hasta aquí
+              let extraT = 0; // lo que suele variar desde la posición actual del bus hasta esta parada
+              if (ia >= 0 && ib >= ia) {
+                if (ia > 0) extraT += fraccionRestante(stopsData.get(ts[ia - 1].stop_id), stopsData.get(ts[ia].stop_id), live.lat, live.lon) * driftsTrip(ts)[ia - 1];
+                extraT += driftEntre(ts, ia, ib);
+              }
+              const total = delay + extraT;
               estSec = timeToSeconds(st.departure_time) + total;
               const dm = Math.round(total/60);
               if      (dm >  1) delayPill = `<span class="delay-pill delay">+${dm}m</span>`;
@@ -1887,6 +1900,8 @@ async function localizarBusEnTiempoReal(targetTripId, targetVehicleRef) {
             currentBusDelayInSeconds = computeBusDelay(prevST, nextST,
               prevST?stopsData.get(prevST.stop_id):null, stopsData.get(nextST.stop_id),
               isNaN(lat)?null:lat, isNaN(lon)?null:lon, recAt) ?? 0;
+            currentBusFracRemaining = fraccionRestante(prevST?stopsData.get(prevST.stop_id):null, stopsData.get(nextST.stop_id),
+              isNaN(lat)?null:lat, isNaN(lon)?null:lon);
             const dm = Math.round(currentBusDelayInSeconds/60);
             if      (currentBusDelayInSeconds >  60) { delayEl.textContent=`Retraso estimado: ${dm} min`;    delayEl.style.color='#D0021B'; }
             else if (currentBusDelayInSeconds < -60) { delayEl.textContent=`Adelanto: ${Math.abs(dm)} min`; delayEl.style.color='var(--green)'; }
@@ -1911,14 +1926,15 @@ function renderStopList(stopsOnRoute) {
   let extra = 0; // deriva acumulada desde la próxima parada del bus
   const drs = driftsTrip(stopsOnRoute);
   stopsOnRoute.forEach((st, idx) => {
-    if (k >= 0 && idx > k) extra += drs[idx - 1];
+    if (k > 0 && idx === k) extra = currentBusFracRemaining * drs[k - 1]; // lo que le falta del tramo en el que está ahora
+    else if (k >= 0 && idx > k) extra += drs[idx - 1];
     const info = stopsData.get(st.stop_id);
     if (!info) return;
     const name      = getCleanStopName(st.stop_id);
     const isCurrent = currentBusStopIdRealTime && st.stop_id === currentBusStopIdRealTime;
     let estHtml = '';
     if (currentBusDelayInSeconds !== null) {
-      const d = currentBusDelayInSeconds + (k >= 0 && idx > k ? extra : 0);
+      const d = currentBusDelayInSeconds + (k >= 0 && idx >= k ? extra : 0);
       const estSec = timeToSeconds(st.arrival_time) + d;
       estHtml = Math.abs(d) > 60
         ? `<span class="est"${extra ? ' title="Ajustado con tiempos reales de este tramo"' : ''}>${secondsToTime(estSec)}</span>`
