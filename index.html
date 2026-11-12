@@ -454,7 +454,7 @@ function fraccionRestante(prevInfo, nextInfo, busLat, busLon) {
 // (con lecturas del SIRI cada ~2 min). Aquí se compara con el horario del GTFS: ritmo = Σ tiempo real / Σ horario. Si en una hora los buses van un 20 % más lentos que el horario, cada tramo se alarga un 20 %.
 // Sin datos fiables (pocas muestras, fallo del Worker o más de 2 s de espera) no cambia nada: método clásico.
 // ═══════════════════════════════════════════════════════
-const TRAMOS_MIN_N = 8, TRAMOS_TTL = 5 * 60 * 1000, TRAMOS_TIMEOUT = 2000, TRAMOS_MAX_SALTO = 8, TRAMOS_VENTANA = 3, TRAMOS_PRIOR = 4, TRAMOS_LARGO = 180;
+const TRAMOS_MIN_N = 8, TRAMOS_TTL = 5 * 60 * 1000, TRAMOS_TIMEOUT = 2000, TRAMOS_MAX_SALTO = 8, TRAMOS_VENTANA = 3, TRAMOS_PRIOR = 4, TRAMOS_LARGO = 240;
 const tramosCache = new Map();     // "A-B" → { hora: [n, mediaSeg] }
 const tramosVisto = new Map();     // stop_id → cuándo se pidió por última vez
 const tripStopsCache = new Map();  // trip_id → paradas ordenadas
