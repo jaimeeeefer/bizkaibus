@@ -399,7 +399,7 @@ const stopIcon = L.icon({
 });
 
 let markers = [], stopMarkers = [], linePolylines = [], realTimeBusMarker = null;
-let currentBusDelayInSeconds = null, currentBusStopIdRealTime = null, currentBusFracRemaining = 0.5;
+let currentBusDelayInSeconds = null, currentBusStopIdRealTime = null, currentBusFracRemaining = 0.5, currentBusDelayHeaderActive = false;
 const COLORS = ['#00873D','#1565C0','#2E7D32','#E65100','#6A1B9A'];
 
 // ─── Haversine ──────────────────────────────────────────
@@ -439,6 +439,22 @@ function computeBusDelay(prevStop, nextStop, prevInfo, nextInfo, busLat, busLon,
   return actual - schedArr;
 }
 
+
+// Texto y color del retraso/adelanto que se muestra en la cabecera del bus
+function escribirRetrasoCabecera(seg) {
+  const el = document.getElementById('delay-info');
+  if (!el) return;
+  const dm = Math.round(seg / 60);
+  if      (seg >  60) { el.textContent = `Retraso estimado: ${dm} min`;    el.style.color = '#D0021B'; }
+  else if (seg < -60) { el.textContent = `Adelanto: ${Math.abs(dm)} min`; el.style.color = 'var(--green)'; }
+  else                { el.textContent = 'En hora';                        el.style.color = 'var(--green)'; }
+}
+
+// Retraso (+) o adelanto (−) previsto al llegar a la próxima parada: el actual más lo que suele variar en lo que le falta del tramo
+function retrasoProximaParada(ts, nextStopId) {
+  const k = ts.findIndex(s => s.stop_id === nextStopId);
+  return currentBusDelayInSeconds + (k > 0 ? currentBusFracRemaining * driftsTrip(ts)[k - 1] : 0);
+}
 
 // Fracción del tramo actual (parada anterior → próxima) que le falta al bus por recorrer: 1 = acaba de salir, 0 = llegando
 function fraccionRestante(prevInfo, nextInfo, busLat, busLon) {
@@ -629,7 +645,7 @@ function todayDow() { return new Date().getDay(); }
 // MAP CLEANUP
 // ═══════════════════════════════════════════════════════
 function clearMapElements() {
-  currentBusDelayInSeconds = null; currentBusStopIdRealTime = null; currentBusFracRemaining = 0.5;
+  currentBusDelayInSeconds = null; currentBusStopIdRealTime = null; currentBusFracRemaining = 0.5; currentBusDelayHeaderActive = false;
   document.getElementById('delay-info').textContent = '';
   if (realTimeBusMarker) { map.removeLayer(realTimeBusMarker); realTimeBusMarker = null; }
   linePolylines.forEach(p => map.removeLayer(p)); linePolylines = [];
@@ -1895,7 +1911,7 @@ async function localizarBusEnTiempoReal(targetTripId, targetVehicleRef) {
         const curSec   = nowSeconds();
         const delayEl  = document.getElementById('delay-info');
         if (curSec < firstDep) {
-          currentBusDelayInSeconds = 0;
+          currentBusDelayInSeconds = 0; currentBusDelayHeaderActive = false;
           delayEl.textContent = 'Esperando salida de cabecera'; delayEl.style.color='#F5A623';
         } else {
           const nextST = allStops.find(s => s.stop_id === spRef);
@@ -1906,10 +1922,8 @@ async function localizarBusEnTiempoReal(targetTripId, targetVehicleRef) {
               isNaN(lat)?null:lat, isNaN(lon)?null:lon, recAt) ?? 0;
             currentBusFracRemaining = fraccionRestante(prevST?stopsData.get(prevST.stop_id):null, stopsData.get(nextST.stop_id),
               isNaN(lat)?null:lat, isNaN(lon)?null:lon);
-            const dm = Math.round(currentBusDelayInSeconds/60);
-            if      (currentBusDelayInSeconds >  60) { delayEl.textContent=`Retraso estimado: ${dm} min`;    delayEl.style.color='#D0021B'; }
-            else if (currentBusDelayInSeconds < -60) { delayEl.textContent=`Adelanto: ${Math.abs(dm)} min`; delayEl.style.color='var(--green)'; }
-            else                                     { delayEl.textContent='En hora';                        delayEl.style.color='var(--green)'; }
+            currentBusDelayHeaderActive = true;
+            escribirRetrasoCabecera(retrasoProximaParada(allStops, spRef)); // el de la próxima parada, no el de la posición actual
           }
         }
       }
@@ -1932,6 +1946,7 @@ function renderStopList(stopsOnRoute) {
   const k = currentBusStopIdRealTime ? stopsOnRoute.findIndex(s => s.stop_id === currentBusStopIdRealTime) : -1;
   let extra = 0; // deriva acumulada desde la próxima parada del bus
   const drs = driftsTrip(stopsOnRoute);
+  if (currentBusDelayHeaderActive && k >= 0) escribirRetrasoCabecera(retrasoProximaParada(stopsOnRoute, currentBusStopIdRealTime)); // cabecera = adelanto/retraso en la próxima parada
   stopsOnRoute.forEach((st, idx) => {
     if (k > 0 && idx === k) extra = currentBusFracRemaining * drs[k - 1]; // lo que le falta del tramo en el que está ahora
     else if (k >= 0 && idx > k) extra += drs[idx - 1];
