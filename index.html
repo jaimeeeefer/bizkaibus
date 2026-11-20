@@ -482,7 +482,7 @@ const depSec = s => timeToSeconds(s.departure_time || s.arrival_time);
 
 function getTripStops(tripId) {
   let a = tripStopsCache.get(tripId);
-  if (!a) { a = (stopTimesByTrip.get(tripId) || []).slice().sort((x, y) => x.stop_sequence - y.stop_sequence); tripStopsCache.set(tripId, a); }
+  if (!a) { a = (stopTimesByTrip.get(tripId) || []).slice().sort((x, y) => x.stop_sequence - y.stop_sequence); if (a.length) tripStopsCache.set(tripId, a); } // un resultado vacío (datos aún sin cargar) no se guarda
   return a;
 }
 
@@ -589,6 +589,7 @@ async function tiempoEntre(a, b) {
 // ═══════════════════════════════════════════════════════
 let stopsData        = new Map();
 let busInfoMap       = new Map();
+let _gtfsResolve; const gtfsReady = new Promise(r => { _gtfsResolve = r; }); // se resuelve cuando termina de cargar el GTFS (o falla)
 let stopTimesData    = [];
 const stopTimesByStop = new Map(), stopTimesByTrip = new Map(); // índices para no recorrer todo stopTimesData en cada consulta
 let tripsData        = new Map();
@@ -669,6 +670,10 @@ function usarURLsGitHub() {
 }
 
 async function cargarDatosGTFS() {
+  try { await cargarDatosGTFSInterno(); }
+  finally { tripStopsCache.clear(); driftMemo = new WeakMap(); _gtfsResolve(); } // los resultados provisionales se descartan
+}
+async function cargarDatosGTFSInterno() {
   setLoading('Comprobando versión de datos…');
   try {
     const headRes = await fetch(STOP_TIMES1_URL, { method: 'HEAD' });
@@ -1065,6 +1070,7 @@ let lastModelSearch = null;
 let currentBusSearch = null;
 
 async function buscarBusesPorLinea() {
+  await gtfsReady;
   const inputRaw = document.getElementById('linea').value.trim();
   if (!inputRaw) return;
   lastLineSearch = inputRaw.toUpperCase();
@@ -1328,6 +1334,7 @@ async function refrescarTodosLosBuses() {
 let currentStopId = null;
 
 async function buscarBusesPorParada() {
+  await gtfsReady;
   let stopId = document.getElementById('parada').value.trim() || selectedStopId;
   if (!stopId) {
     const q = document.getElementById('parada-nombre').value.trim().toLowerCase();
@@ -1694,6 +1701,8 @@ async function buscarBusPorNumero() {
   document.getElementById('route-stop-list').innerHTML = '<div class="empty-state"><div class="spinner" style="margin:0 auto"></div></div>';
   updateBusFavBtnState(input);
 
+  await gtfsReady; // si aún se están cargando los horarios, se espera (se ve el indicador de carga)
+  if (currentBusSearch !== input) return; // el usuario ha lanzado otra búsqueda mientras tanto
   const foundTripId = await localizarBusEnTiempoReal(null, input);
   if (foundTripId) {
     const trip = tripsData.get(foundTripId);
@@ -1976,6 +1985,7 @@ function renderStopList(stopsOnRoute) {
 }
 
 async function mostrarRecorrido(tripId, shapeId) {
+  await gtfsReady;
   clearLineMarkers();
   stopMarkers.forEach(m => map.removeLayer(m)); stopMarkers = [];
   linePolylines.forEach(p => map.removeLayer(p)); linePolylines = [];
